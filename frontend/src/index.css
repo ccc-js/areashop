@@ -1,0 +1,43 @@
+/* areashop v0.1：行動優先、大按鈕大字體 */
+:root {
+  --bg: #faf8f2;
+  --card: #fff;
+  --ink: #2b2b2b;
+  --muted: #8a8a8a;
+  --brand: #2e7d32;
+  --brand-ink: #fff;
+  --line: #e5e0d5;
+  --err: #c62828;
+  font-size: 18px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: system-ui, "Noto Sans TC", sans-serif; }
+.nav { display: flex; gap: 0.8rem; align-items: center; padding: 0.7rem 1rem; background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; }
+.nav .logo { font-weight: 800; color: var(--brand); text-decoration: none; margin-right: auto; }
+.nav a { color: var(--ink); text-decoration: none; }
+.nav button { font-size: 1rem; }
+.main { max-width: 720px; margin: 0 auto; padding: 1rem; }
+button { background: var(--brand); color: var(--brand-ink); border: 0; border-radius: 10px; padding: 0.7rem 1.1rem; font-size: 1.05rem; cursor: pointer; }
+button:disabled { opacity: 0.5; }
+input, select { font-size: 1.05rem; padding: 0.6rem; border: 1px solid var(--line); border-radius: 10px; width: 100%; background: #fff; }
+.area-bar, .search-bar { display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.8rem; }
+.search-bar input { flex: 1; }
+.search-bar button { width: auto; white-space: nowrap; }
+.hint { color: var(--muted); font-size: 0.85rem; }
+.error { color: var(--err); }
+.empty { color: var(--muted); padding: 2rem 0; text-align: center; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 0.8rem; text-decoration: none; color: inherit; }
+.card-title { font-weight: 700; margin-bottom: 0.3rem; }
+.card-meta { color: var(--muted); font-size: 0.9rem; }
+.card-stock { margin-top: 0.3rem; font-size: 0.9rem; }
+.form { display: flex; flex-direction: column; gap: 0.7rem; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem; }
+.detail .price { font-size: 1.4rem; font-weight: 800; color: var(--brand); }
+.back { background: #e8e4d8; color: var(--ink); margin-bottom: 0.6rem; }
+.buy-box { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 1rem; }
+.order { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 0.8rem; margin-bottom: 0.6rem; }
+.order .row { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.order .row button { padding: 0.5rem 0.8rem; font-size: 0.95rem; }
+.tabs { display: flex; gap: 0.5rem; margin-bottom: 0.8rem; }
+.tabs button { background: #e8e4d8; color: var(--ink); }
+.tabs button.on { background: var(--brand); color: #fff; }

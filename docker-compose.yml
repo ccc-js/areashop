@@ -1,0 +1,34 @@
+name: areashop
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: areashop
+      POSTGRES_PASSWORD: areashop
+      POSTGRES_DB: areashop
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgres://areashop:areashop@db:5432/areashop
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+  web:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

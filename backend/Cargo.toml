@@ -1,0 +1,32 @@
+[package]
+name = "areashop-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sea-orm = { version = "1.1", features = ["sqlx-sqlite", "sqlx-postgres", "runtime-tokio-rustls", "macros"] }
+sea-schema = "0.16"
+jsonwebtoken = "9"
+argon2 = { version = "0.5", features = ["std"] }
+password-hash = "0.5"
+rand_core = { version = "0.6", features = ["getrandom"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+validator = { version = "0.18", features = ["derive"] }
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dotenvy = "0.15"
+utoipa = { version = "4", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "7", features = ["axum"] }
+
+[dev-dependencies]
+axum-test = "16"
+tokio = { version = "1", features = ["full"] }
