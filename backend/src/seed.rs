@@ -19,6 +19,7 @@ struct SeedShop<'a> {
 /// 統一項目：stock 有值 = 賣東西；bookable = 可選日期；兩者都開 = 混合
 struct SeedItem<'a> {
     title: &'a str,
+    category: &'a str, // fresh | food | daily | service | other
     desc: Option<&'a str>,
     price_cents: i32,
     unit: &'a str,
@@ -119,6 +120,7 @@ async fn mk_shop_with_items(
         let m = item::ActiveModel {
             shop_id: Set(sh.id),
             title: Set(p.title.to_string()),
+            category: Set(p.category.to_string()),
             description: Set(p.desc.map(|d| d.to_string())),
             price_cents: Set(p.price_cents),
             unit: Set(p.unit.to_string()),
@@ -201,6 +203,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             items: vec![
                 SeedItem {
                     title: "放山土雞（全雞）",
+                    category: "fresh",
                     desc: None,
                     price_cents: 45000,
                     unit: "隻",
@@ -211,6 +214,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
                 },
                 SeedItem {
                     title: "土雞蛋 10 顆",
+                    category: "fresh",
                     desc: None,
                     price_cents: 12000,
                     unit: "盒",
@@ -231,6 +235,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             items: vec![
                 SeedItem {
                     title: "野蓮 1 把",
+                    category: "fresh",
                     desc: None,
                     price_cents: 8000,
                     unit: "把",
@@ -241,6 +246,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
                 },
                 SeedItem {
                     title: "橙蜜番茄 1 盒",
+                    category: "fresh",
                     desc: None,
                     price_cents: 15000,
                     unit: "盒",
@@ -261,6 +267,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             items: vec![
                 SeedItem {
                     title: "高麗菜水餃 20 顆",
+                    category: "food",
                     desc: Some("現包冷凍，也可預訂面交日"),
                     price_cents: 16000,
                     unit: "包",
@@ -271,6 +278,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
                 },
                 SeedItem {
                     title: "韭菜水餃 20 顆",
+                    category: "food",
                     desc: None,
                     price_cents: 16000,
                     unit: "包",
@@ -291,6 +299,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             items: vec![
                 SeedItem {
                     title: "牛肋條 600g",
+                    category: "food",
                     desc: None,
                     price_cents: 52000,
                     unit: "包",
@@ -301,6 +310,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
                 },
                 SeedItem {
                     title: "牛腱心 600g",
+                    category: "food",
                     desc: None,
                     price_cents: 48000,
                     unit: "包",
@@ -327,6 +337,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             items: vec![
                 SeedItem {
                     title: "金門土雞（全雞）",
+                    category: "fresh",
                     desc: None,
                     price_cents: 50000,
                     unit: "隻",
@@ -337,6 +348,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
                 },
                 SeedItem {
                     title: "金門土雞蛋 10 顆",
+                    category: "fresh",
                     desc: None,
                     price_cents: 13000,
                     unit: "盒",
@@ -357,6 +369,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             items: vec![
                 SeedItem {
                     title: "金門高麗菜 1 顆",
+                    category: "fresh",
                     desc: None,
                     price_cents: 9000,
                     unit: "顆",
@@ -367,6 +380,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
                 },
                 SeedItem {
                     title: "金門蒜頭 1 斤",
+                    category: "fresh",
                     desc: None,
                     price_cents: 12000,
                     unit: "斤",
@@ -386,6 +400,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             addr: "金城鎮模範街口面交",
             items: vec![SeedItem {
                 title: "高麗菜豬肉水餃 20 顆",
+                category: "food",
                 desc: Some("現包，也可預訂面交日"),
                 price_cents: 17000,
                 unit: "包",
@@ -405,6 +420,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             items: vec![
                 SeedItem {
                     title: "酒糟牛肋條 600g",
+                    category: "food",
                     desc: None,
                     price_cents: 56000,
                     unit: "包",
@@ -415,6 +431,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
                 },
                 SeedItem {
                     title: "酒糟牛火鍋片 400g",
+                    category: "food",
                     desc: None,
                     price_cents: 42000,
                     unit: "盒",
@@ -444,6 +461,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             items: vec![
                 SeedItem {
                     title: "金門手工麵線 5 束",
+                    category: "fresh",
                     desc: None,
                     price_cents: 20000,
                     unit: "袋",
@@ -454,6 +472,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
                 },
                 SeedItem {
                     title: "金門花生 1 包",
+                    category: "fresh",
                     desc: None,
                     price_cents: 15000,
                     unit: "包",
@@ -479,6 +498,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             opening_hours: Some("接送時間：每日 09:00-18:00（先預約）"),
             items: vec![SeedItem {
                 title: "貓狗寄養 1 天",
+                category: "service",
                 desc: Some("中小型犬貓皆可，請自備飼料；疫苗證明入住時出示"),
                 price_cents: 60000,
                 unit: "天",
@@ -497,6 +517,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             opening_hours: Some("週二至週六 09:00-18:00"),
             items: vec![SeedItem {
                 title: "男士快剪",
+                category: "service",
                 desc: Some("含洗髮，約 30 分鐘"),
                 price_cents: 30000,
                 unit: "次",
@@ -515,6 +536,7 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             opening_hours: Some("週二至週六 09:00-12:00、14:00-18:00"),
             items: vec![SeedItem {
                 title: "家醫科掛號",
+                category: "service",
                 desc: Some("掛號登記用"),
                 price_cents: 20000,
                 unit: "號",
@@ -555,6 +577,7 @@ async fn seed_hawaii(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             items: vec![
                 SeedItem {
                     title: "Ahi Poke Bowl",
+                    category: "food",
                     desc: Some("Fresh tuna, rice, seaweed salad"),
                     price_cents: 1250,
                     unit: "bowl",
@@ -565,6 +588,7 @@ async fn seed_hawaii(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
                 },
                 SeedItem {
                     title: "Spam Musubi (3 pcs)",
+                    category: "food",
                     desc: None,
                     price_cents: 450,
                     unit: "pack",
@@ -584,6 +608,7 @@ async fn seed_hawaii(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             addr: "Meet at Waikiki Beach, in front of Duke statue",
             items: vec![SeedItem {
                 title: "Beginner Surf Lesson",
+                category: "service",
                 desc: Some("1-hour lesson, board included"),
                 price_cents: 8000,
                 unit: "session",
@@ -602,6 +627,7 @@ async fn seed_hawaii(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
             addr: "Pickup at Kailua Rd store",
             items: vec![SeedItem {
                 title: "Rainbow Shave Ice",
+                category: "food",
                 desc: None,
                 price_cents: 650,
                 unit: "cup",

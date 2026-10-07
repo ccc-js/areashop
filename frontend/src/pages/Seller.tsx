@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, nt, type Item } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { useLang } from "../lib/i18n";
+import { useLang, CATS } from "../lib/i18n";
 import { toast } from "../lib/toast";
 import { useArea } from "../lib/area";
 
@@ -16,7 +16,7 @@ interface Shop {
 export default function Seller() {
   const { user } = useAuth();
   const { current } = useArea();
-  const { t } = useLang();
+  const { t, catLabel } = useLang();
   const [shops, setShops] = useState<Shop[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [shopName, setShopName] = useState("");
@@ -25,6 +25,7 @@ export default function Seller() {
   const [hours, setHours] = useState("");
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
+  const [category, setCategory] = useState("other");
   // 庫存空白 = 不限量（賣服務）；可預約打勾才設時間
   const [stock, setStock] = useState("");
   const [bookable, setBookable] = useState(false);
@@ -107,6 +108,7 @@ export default function Seller() {
           shop_id: shops[0].id,
           title,
           price_cents: Math.round(Number(price) * 100),
+          category,
           stock: stock.trim() === "" ? null : Number(stock),
           unit: "份",
           bookable,
@@ -160,6 +162,14 @@ export default function Seller() {
             <h3>{t("seller.listTitle")}</h3>
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("seller.namePh")} />
             <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder={t("seller.pricePh")} />
+            <label>
+              {t("home.category")}
+              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                {CATS.map((c) => (
+                  <option key={c} value={c}>{catLabel(c)}</option>
+                ))}
+              </select>
+            </label>
             <input value={stock} onChange={(e) => setStock(e.target.value)} placeholder={t("seller.stockPh")} />
             <label>
               <input type="checkbox" checked={bookable} onChange={(e) => setBookable(e.target.checked)} />

@@ -36,6 +36,8 @@ pub(crate) struct CreateItem {
     description: Option<String>,
     #[validate(range(min = 0))]
     price_cents: i32,
+    #[serde(default = "default_cat")]
+    category: String,
     #[serde(default = "default_unit")]
     unit: String,
     #[serde(default)]
@@ -51,6 +53,10 @@ pub(crate) struct CreateItem {
 
 fn default_unit() -> String {
     "份".to_string()
+}
+
+fn default_cat() -> String {
+    "other".to_string()
 }
 
 async fn require_owner(
@@ -76,6 +82,9 @@ pub(crate) async fn create(
 ) -> Result<Json<item::Model>, (StatusCode, String)> {
     req.validate()
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    if !crate::search::valid_category(&req.category) {
+        return Err((StatusCode::BAD_REQUEST, "bad category".into()));
+    }
     if let Some(st) = req.stock {
         if st < 0 {
             return Err((StatusCode::BAD_REQUEST, "bad stock".into()));
@@ -93,6 +102,7 @@ pub(crate) async fn create(
         title: Set(req.title),
         description: Set(req.description),
         price_cents: Set(req.price_cents),
+        category: Set(req.category),
         unit: Set(req.unit),
         images: Set(if req.images.is_null() {
             serde_json::json!([])
@@ -120,6 +130,8 @@ pub(crate) struct ListQ {
     county: Option<String>,
     q: Option<String>,
     shop_id: Option<i32>,
+    /// 分類過濾：fresh | food | daily | service | other
+    category: Option<String>,
     /// 只看可預約
     bookable: Option<bool>,
     #[serde(default = "d_page")]
@@ -211,14 +223,29 @@ pub(crate) async fn list(
     if q.bookable == Some(true) {
         sel = sel.filter(item::Column::Bookable.eq(true));
     }
-    // q 關鍵字：跨 DB 通用內存過濾會全表掃；MVP 資料小可接受（v0.3 上 pg_trgm）
+    if let Some(cat) = &q.category {
+        if !cat.is_empty() {
+            if !crate::search::valid_category(cat) {
+                return Err((StatusCode::BAD_REQUEST, "bad category".into()));
+            }
+            sel = sel.filter(item::Column::Category.eq(cat.clone()));
+        }
+    }
+    // q 關鍵字：中文分詞簡易版（標題＋描述，AND），跨 DB 通用內存過濾；
+    // MVP 資料小可接受（v0.4 上 pg_trgm）
     let mut all = sel
         .all(&s.db)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     if let Some(kw) = q.q {
         if !kw.is_empty() {
-            all.retain(|p| p.title.contains(&kw));
+            let tokens = crate::search::tokenize(&kw);
+            all.retain(|p| {
+                crate::search::matches(
+                    &format!("{} {}", p.title, p.description.as_deref().unwrap_or("")),
+                    &tokens,
+                )
+            });
         }
     }
     // 只看上架
@@ -335,6 +362,7 @@ pub(crate) struct UpdateItem {
     title: Option<String>,
     description: Option<String>,
     price_cents: Option<i32>,
+    category: Option<String>,
     unit: Option<String>,
     /// 庫存；配合 unlimited 使用
     stock: Option<i32>,
@@ -373,6 +401,12 @@ pub(crate) async fn update(
             return Err((StatusCode::BAD_REQUEST, "bad price".into()));
         }
         am.price_cents = Set(v);
+    }
+    if let Some(v) = req.category {
+        if !crate::search::valid_category(&v) {
+            return Err((StatusCode::BAD_REQUEST, "bad category".into()));
+        }
+        am.category = Set(v);
     }
     if let Some(v) = req.unit {
         am.unit = Set(v);

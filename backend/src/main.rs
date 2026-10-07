@@ -4,6 +4,7 @@ mod config;
 mod entities;
 mod routes;
 mod schema;
+mod search;
 mod seed;
 mod state;
 

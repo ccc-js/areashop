@@ -13,6 +13,8 @@ pub struct Model {
     pub shop_id: i32,
     pub title: String,
     pub description: Option<String>,
+    /// 分類：fresh 生鮮 | food 食品 | daily 日用 | service 服務 | other 其他
+    pub category: String,
     /// 以分為單位（可為 0，如免費諮詢）
     pub price_cents: i32,
     pub unit: String,

@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { api, nt, type Item } from "../lib/api";
 import { useArea } from "../lib/area";
-import { useLang } from "../lib/i18n";
+import { CATS, useLang } from "../lib/i18n";
 
 // 首頁狀態全部收進 URL（?county=&town=&q=）：上一頁返回、重新整理、分享連結
 // 都會回到同一個篩選狀態；捲動位置用 sessionStorage 按 URL 記憶。
 // 賣東西和賣服務同一種：一個列表，徽章區分（可預約 / 剩件數 / 不限量）。
 export default function Home() {
   const { areas, current, setCurrentId } = useArea();
-  const { t } = useLang();
+  const { t, catLabel } = useLang();
   const [sp, setSp] = useSearchParams();
   const location = useLocation();
   const [items, setItems] = useState<Item[]>([]);
@@ -19,6 +19,7 @@ export default function Home() {
   const county = sp.get("county") ?? current?.county ?? counties[0] ?? "";
   const town = sp.get("town") ?? (current ? String(current.id) : "all");
   const q = sp.get("q") ?? "";
+  const cat = sp.get("cat") ?? "";
   const [draft, setDraft] = useState(q);
   // 上一頁/下一頁切換 URL 時，輸入框跟著還原（打字中不會觸發，因打字不改 URL）
   useEffect(() => {
@@ -52,6 +53,8 @@ export default function Home() {
     else params.set("area_id", town);
     const kw = sp.get("q");
     if (kw) params.set("q", kw);
+    const ck = sp.get("cat");
+    if (ck) params.set("category", ck);
     let alive = true;
     api<{ items: Item[]; total: number }>(`/items?${params}`)
       .then((d) => {
@@ -120,6 +123,18 @@ export default function Home() {
           placeholder={t("home.searchPh")}
         />
         <button onClick={search}>{t("home.search")}</button>
+      </div>
+
+      <div className="area-bar">
+        <label>
+          {t("home.category")}
+          <select value={cat} onChange={(e) => update({ cat: e.target.value })}>
+            <option value="">{t("home.catAll")}</option>
+            {CATS.map((c) => (
+              <option key={c} value={c}>{catLabel(c)}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {err && <p className="error">{err}</p>}

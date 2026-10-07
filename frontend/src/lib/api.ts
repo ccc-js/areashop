@@ -32,6 +32,7 @@ export interface Item {
   title: string;
   description: string | null;
   price_cents: number;
+  category: string; // fresh | food | daily | service | other
   unit: string;
   status: string;
   stock: number | null; // null = 不限量

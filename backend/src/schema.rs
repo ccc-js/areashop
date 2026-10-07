@@ -72,6 +72,11 @@ pub async fn setup_schema(db: &DbConn) -> Result<(), DbErr> {
     full.boolean().not_null().default(false);
     add_column_if_missing(db, "availability_exceptions", full).await?;
 
+    // v0.4 搜尋：items 加 category 欄（舊庫補上，預設 other）
+    let mut cat = ColumnDef::new(Alias::new("category"));
+    cat.string().not_null().default("other");
+    add_column_if_missing(db, "items", cat).await?;
+
     // 補索引（items 列表最常用；建表語句不含 index，這裡跨 DB 通用）
     for (table, col) in [
         ("items", "shop_id"),

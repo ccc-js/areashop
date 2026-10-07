@@ -132,18 +132,20 @@ suite() { # suite <標籤>：完整 API 流程，假設是全新 DB（含種子�
 
   # --- 上架（統一路徑：賣東西 / 賣服務 / 混合同一種） ---
   expect "$tag 上架商品型" 200 POST /items "$TOKEN_NEW" \
-    "{\"shop_id\":$SHOP,\"title\":\"測試水餃\",\"price_cents\":16000,\"stock\":5,\"unit\":\"包\"}"
+    "{\"shop_id\":$SHOP,\"title\":\"測試水餃\",\"description\":\"現包冷凍\",\"price_cents\":16000,\"stock\":5,\"unit\":\"包\",\"category\":\"food\"}"
   PID="$(jget "$TMP/body.json" "d['id']")"
   expect "$tag 上架服務型" 200 POST /items "$TOKEN_NEW" \
-    "{\"shop_id\":$SHOP,\"title\":\"測試快剪\",\"price_cents\":30000,\"stock\":null,\"bookable\":true}"
+    "{\"shop_id\":$SHOP,\"title\":\"測試快剪\",\"price_cents\":30000,\"stock\":null,\"bookable\":true,\"category\":\"service\"}"
   SID="$(jget "$TMP/body.json" "d['id']")"
   expect "$tag 上架混合型" 200 POST /items "$TOKEN_NEW" \
-    "{\"shop_id\":$SHOP,\"title\":\"預訂水餃\",\"price_cents\":16000,\"stock\":3,\"unit\":\"包\",\"bookable\":true}"
+    "{\"shop_id\":$SHOP,\"title\":\"預訂水餃\",\"price_cents\":16000,\"stock\":3,\"unit\":\"包\",\"bookable\":true,\"category\":\"food\"}"
   MID="$(jget "$TMP/body.json" "d['id']")"
   expect "$tag 他人商店上架→403" 403 POST /items "$TOKEN_B" \
     "{\"shop_id\":$SHOP,\"title\":\"偷渡\",\"price_cents\":100,\"stock\":1}"
   expect "$tag 無庫存又不可約→400" 400 POST /items "$TOKEN_NEW" \
     "{\"shop_id\":$SHOP,\"title\":\"爛\",\"price_cents\":100}"
+  expect "$tag 爛分類→400" 400 POST /items "$TOKEN_NEW" \
+    "{\"shop_id\":$SHOP,\"title\":\"爛\",\"price_cents\":100,\"stock\":1,\"category\":\"nope\"}"
   expect "$tag 地區列表" 200 GET "/items?area_id=$AREA"
   [ "$(jget "$TMP/body.json" "d['total']")" -ge 3 ] && ok "$tag 列表有3項" || bad "$tag 列表" "-"
   expect "$tag 不分區全縣" 200 GET "/items?county=金門縣"
@@ -152,6 +154,23 @@ suite() { # suite <標籤>：完整 API 流程，假設是全新 DB（含種子�
   [ "$(jget "$TMP/body.json" "d['total']")" = "0" ] && ok "$tag 不存在的縣回空" || bad "$tag 不存在的縣應回空" "-"
   expect "$tag 只看可預約" 200 GET "/items?shop_id=$SHOP&bookable=true"
   [ "$(jget "$TMP/body.json" "d['total']")" = "2" ] && ok "$tag 2個可預約" || bad "$tag bookable篩選" "-"
+  expect "$tag 分類過濾food" 200 GET "/items?shop_id=$SHOP&category=food"
+  [ "$(jget "$TMP/body.json" "d['total']")" = "2" ] && ok "$tag food有2個" || bad "$tag 分類篩選" "-"
+  expect "$tag 分類過濾service" 200 GET "/items?shop_id=$SHOP&category=service"
+  [ "$(jget "$TMP/body.json" "d['total']")" = "1" ] && ok "$tag service有1個" || bad "$tag 分類篩選" "-"
+  expect "$tag 爛分類查詢→400" 400 GET "/items?shop_id=$SHOP&category=nope"
+  expect "$tag 關鍵字中文分詞" 200 GET "/items?shop_id=$SHOP&q=測試水餃"
+  [ "$(jget "$TMP/body.json" "d['total']")" = "1" ] && ok "$tag 中文命中1個" || bad "$tag 中文分詞" "-"
+  expect "$tag 關鍵字含空白標點" 200 GET "/items?shop_id=$SHOP&q=測試，水餃"
+  [ "$(jget "$TMP/body.json" "d['total']")" = "1" ] && ok "$tag 標點容錯" || bad "$tag 標點容錯" "-"
+  expect "$tag 關鍵字AND需全中" 200 GET "/items?shop_id=$SHOP&q=測試快剪水餃"
+  [ "$(jget "$TMP/body.json" "d['total']")" = "0" ] && ok "$tag 全中才回" || bad "$tag AND語義" "-"
+  expect "$tag 描述也命中" 200 GET "/items?shop_id=$SHOP&q=現包冷凍"
+  [ "$(jget "$TMP/body.json" "d['total']")" = "1" ] && ok "$tag 描述命中" || bad "$tag 描述搜尋" "-"
+  expect "$tag 改分類" 200 PATCH "/items/$PID" "$TOKEN_NEW" '{"category":"fresh"}'
+  [ "$(jget "$TMP/body.json" "d['category']")" = "fresh" ] && ok "$tag 分類改了" || bad "$tag 改分類" "-"
+  expect "$tag 改爛分類→400" 400 PATCH "/items/$PID" "$TOKEN_NEW" '{"category":"nope"}'
+  expect "$tag 改回food" 200 PATCH "/items/$PID" "$TOKEN_NEW" '{"category":"food"}'
 
   # --- 訂單：直接買正常流程 ---
   expect "$tag 下單" 200 POST /orders "$TOKEN_B" \

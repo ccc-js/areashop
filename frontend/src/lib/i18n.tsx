@@ -39,6 +39,13 @@ const dict = {
   "home.search": ["搜尋", "搜索", "Search"],
   "home.empty": ["這個地區還沒有東西，去隔壁鄉鎮看看吧。", "这个地区还没有东西，去隔壁乡镇看看吧。", "Nothing here yet — check nearby areas."],
   "home.bookable": ["可預約", "可预约", "Bookable"],
+  "home.category": ["分類", "分类", "Category"],
+  "home.catAll": ["不分類", "不分类", "All"],
+  "cat.fresh": ["生鮮", "生鲜", "Fresh"],
+  "cat.food": ["食品", "食品", "Food"],
+  "cat.daily": ["日用", "日用", "Daily"],
+  "cat.service": ["服務", "服务", "Services"],
+  "cat.other": ["其他", "其他", "Other"],
   "home.left": ["剩 {n}", "剩 {n}", "{n} left"],
   "home.soldout": ["售完", "售完", "Sold out"],
 
@@ -165,7 +172,10 @@ interface LangCtx {
   t: (key: TKey, params?: Record<string, string | number>) => string;
   wdName: (wd: number) => string;
   statusLabel: (s: string) => string;
+  catLabel: (s: string) => string;
 }
+
+export const CATS = ["fresh", "food", "daily", "service", "other"] as const;
 
 const Ctx = createContext<LangCtx>(null as unknown as LangCtx);
 
@@ -181,6 +191,14 @@ const STATUS_KEY: Record<string, TKey> = {
   completed: "status.completed",
   cancelled: "status.cancelled",
   noshow: "status.noshow",
+};
+
+const CAT_KEY: Record<string, TKey> = {
+  fresh: "cat.fresh",
+  food: "cat.food",
+  daily: "cat.daily",
+  service: "cat.service",
+  other: "cat.other",
 };
 
 function detect(): Lang {
@@ -209,7 +227,9 @@ export function LangProvider({ children }: { children: ReactNode }) {
     lang === "en" ? WD_EN[wd] : WD_ZH[wd];
   const statusLabel = (s: string) =>
     STATUS_KEY[s] ? t(STATUS_KEY[s]) : s;
-  return <Ctx.Provider value={{ lang, setLang, t, wdName, statusLabel }}>{children}</Ctx.Provider>;
+  const catLabel = (s: string) =>
+    CAT_KEY[s] ? t(CAT_KEY[s]) : s;
+  return <Ctx.Provider value={{ lang, setLang, t, wdName, statusLabel, catLabel }}>{children}</Ctx.Provider>;
 }
 
 export const useLang = () => useContext(Ctx);

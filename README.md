@@ -42,7 +42,7 @@ DATABASE_URL=postgres://areashop:areashop@localhost:5432/areashop cargo run
 | GET | /api/v1/areas, /counties, /townships?county=, /search?q= | 地區 |
 | POST/GET | /api/v1/shops | 開店／我的店 |
 | GET/PATCH | /api/v1/shops/:id | 店鋪 |
-| POST/GET | /api/v1/items?area_id=&q=&shop_id=&bookable= | 上架／列表（`stock` 空=不限量，`bookable`=可選日期） |
+| POST/GET | /api/v1/items?area_id=&q=&shop_id=&bookable=&category= | 上架／列表（`stock` 空=不限量，`bookable`=可選日期；`q` 中文分詞 AND 配對標題＋描述，`category` 限 fresh/food/daily/service/other） |
 | GET/PATCH | /api/v1/items/:id | 項目（`?month=` 附可接案月曆） |
 | PUT/POST/DELETE | /api/v1/items/:id/rules, /exceptions[/:date] | 週範本／單日開關（額滿・不營業） |
 | POST/GET | /api/v1/orders | 下單（同店、有庫存扣庫存；`date` 有值=預約）／訂單列表 |
