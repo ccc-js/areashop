@@ -15,7 +15,7 @@ interface Shop {
 
 export default function Seller() {
   const { user } = useAuth();
-  const { current } = useArea();
+  const { areas, current } = useArea();
   const { t, catLabel } = useLang();
   const [shops, setShops] = useState<Shop[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -26,6 +26,9 @@ export default function Seller() {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("other");
+  // 開店地區：預設跟著目前地區，可改（避免店掛錯區）
+  const [shopCounty, setShopCounty] = useState("");
+  const [shopTownId, setShopTownId] = useState("");
   // 庫存空白 = 不限量（賣服務）；可預約打勾才設時間
   const [stock, setStock] = useState("");
   const [bookable, setBookable] = useState(false);
@@ -50,12 +53,21 @@ export default function Seller() {
   if (!user) return <p>{t("common.loginFirstShop")}</p>;
 
   const openShop = async () => {
+    const areaId = Number(shopTownId) || current?.id;
+    if (!shopName.trim()) {
+      setMsg(t("seller.needName"));
+      return;
+    }
+    if (!areaId) {
+      setMsg(t("seller.needArea"));
+      return;
+    }
     try {
       await api("/shops", {
         method: "POST",
         body: JSON.stringify({
-          name: shopName,
-          area_id: current?.id,
+          name: shopName.trim(),
+          area_id: areaId,
           kind,
           address: address || undefined,
           opening_hours: hours || undefined,
@@ -140,6 +152,26 @@ export default function Seller() {
         <div className="form">
           <h3>{t("seller.open10")}</h3>
           <input value={shopName} onChange={(e) => setShopName(e.target.value)} placeholder={t("seller.shopNamePh")} />
+          <label>
+            {t("home.county")}
+            <select
+              value={shopCounty || current?.county || ""}
+              onChange={(e) => { setShopCounty(e.target.value); setShopTownId(""); }}
+            >
+              {[...new Set(areas.map((a) => a.county))].map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {t("home.town")}
+            <select value={shopTownId || String(current?.id ?? "")} onChange={(e) => setShopTownId(e.target.value)}>
+              <option value="">{t("seller.pickTown")}</option>
+              {areas.filter((a) => a.county === (shopCounty || current?.county)).map((a) => (
+                <option key={a.id} value={a.id}>{a.township}</option>
+              ))}
+            </select>
+          </label>
           <select value={kind} onChange={(e) => setKind(e.target.value)}>
             <option value="personal">{t("seller.personal")}</option>
             <option value="store">{t("seller.store")}</option>
@@ -148,7 +180,7 @@ export default function Seller() {
             <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("seller.addressPh")} />
           )}
           <input value={hours} onChange={(e) => setHours(e.target.value)} placeholder={kind === "store" ? t("seller.hoursPhStore") : t("seller.hoursPhMeet")} />
-          <button onClick={openShop}>{t("seller.openBtn", { area: `${current?.county ?? ""}${current?.township ?? ""}` })}</button>
+          <button onClick={openShop}>{t("seller.openBtn")}</button>
         </div>
       ) : (
         <>

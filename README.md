@@ -48,6 +48,8 @@ DATABASE_URL=postgres://areashop:areashop@localhost:5432/areashop cargo run
 | POST/GET | /api/v1/orders | 下單（同店、有庫存扣庫存；`date` 有值=預約）／訂單列表 |
 | GET/PATCH | /api/v1/orders/:id | 詳情（含買家＋品名）／confirm→ready→complete／cancel／noshow |
 | GET | /api/v1/provider/calendar?shop_id=&month= | 店家月曆（有日期的單） |
+| POST/PUT/DELETE | /api/v1/admin/areas[/:id] | 地區設定 CRUD（管理員；重複 409、使用中 400） |
+| GET | /api/v1/admin/shops, /items, /users, /orders | 全店＋店主／全項目／使用者／最新訂單一覽（管理員；停權下架沿用 PATCH） |
 
 訂單狀態機：`pending → confirmed → ready → completed ｜ cancelled ｜ noshow`（confirmed 可跳過 ready；noshow 限店主），見
 `backend/src/entities/order.rs`（含單元測試）。

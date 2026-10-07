@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod areas;
 pub mod auth_routes;
 pub mod items;
@@ -43,6 +44,16 @@ pub fn v1_router() -> Router<AppState> {
         )
         // provider calendar（有日期的單，按日聚合）
         .route("/provider/calendar", get(orders::calendar))
+        // admin（管理員介面；一覽唯讀，停權/下架沿用 PATCH）
+        .route("/admin/areas", post(admin::create_area))
+        .route(
+            "/admin/areas/:id",
+            put(admin::update_area).delete(admin::delete_area),
+        )
+        .route("/admin/shops", get(admin::list_shops))
+        .route("/admin/items", get(admin::list_items))
+        .route("/admin/users", get(admin::list_users))
+        .route("/admin/orders", get(admin::list_orders))
 }
 
 async fn healthz() -> &'static str {

@@ -116,6 +116,8 @@ suite() { # suite <標籤>：完整 API 流程，假設是全新 DB（含種子�
   TOKEN_B="$(jget "$TMP/body.json" "d['access_token']")"
   expect "$tag 種子賣家登入" 200 POST /auth/login "" '{"phone":"0900000002","password":"password123"}'
   TOKEN_S="$(jget "$TMP/body.json" "d['access_token']")"
+  expect "$tag 種子管理員登入" 200 POST /auth/login "" '{"phone":"0900000001","password":"password123"}'
+  TOKEN_A="$(jget "$TMP/body.json" "d['access_token']")"
 
   # --- 商店 ---
   expect "$tag 開店" 200 POST /shops "$TOKEN_NEW" \
@@ -316,6 +318,52 @@ suite() { # suite <標籤>：完整 API 流程，假設是全新 DB（含種子�
     "{\"items\":[{\"item_id\":$SID,\"qty\":1}]}"
   expect "$tag 下架不可約→400" 400 POST /orders "$TOKEN_S" \
     "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"$(fdate 10)\"}"
+
+  # --- 管理員：地區 CRUD ---
+  expect "$tag 非管理員建區→403" 403 POST /admin/areas "$TOKEN_NEW" \
+    '{"county":"測試縣","township":"測試鎮"}'
+  expect "$tag 未登入建區→401" 401 POST /admin/areas "" \
+    '{"county":"測試縣","township":"測試鎮"}'
+  expect "$tag 建區" 200 POST /admin/areas "$TOKEN_A" \
+    '{"county":"測試縣","township":"測試鎮"}'
+  NAID="$(jget "$TMP/body.json" "d['id']")"
+  expect "$tag 重複建區→409" 409 POST /admin/areas "$TOKEN_A" \
+    '{"county":"測試縣","township":"測試鎮"}'
+  expect "$tag 建區缺欄→422" 422 POST /admin/areas "$TOKEN_A" \
+    '{"county":"測試縣"}'
+  expect "$tag 改區名" 200 PUT "/admin/areas/$NAID" "$TOKEN_A" \
+    '{"township":"測試鎮改"}'
+  [ "$(jget "$TMP/body.json" "d['township']")" = "測試鎮改" ] && ok "$tag 區名改了" || bad "$tag 改區" "-"
+  expect "$tag 建區自動trim" 200 POST /admin/areas "$TOKEN_A" \
+    '{"county":" 測試縣 ","township":" 空白鎮 "}'
+  [ "$(jget "$TMP/body.json" "d['township']")" = "空白鎮" ] && ok "$tag 空白 trimmed" || bad "$tag trim" "-"
+  TID="$(jget "$TMP/body.json" "d['id']")"
+  expect "$tag 刪trim區" 200 DELETE "/admin/areas/$TID" "$TOKEN_A"
+  expect "$tag 非管理員改區→403" 403 PUT "/admin/areas/$NAID" "$TOKEN_NEW" \
+    '{"township":"壞"}'
+  expect "$tag 改不存在區→404" 404 PUT "/admin/areas/999999" "$TOKEN_A" \
+    '{"township":"壞"}'
+  expect "$tag 使用中刪區→400" 400 DELETE "/admin/areas/$AREA" "$TOKEN_A"
+  expect "$tag 非管理員刪區→403" 403 DELETE "/admin/areas/$NAID" "$TOKEN_NEW"
+  expect "$tag 刪空區" 200 DELETE "/admin/areas/$NAID" "$TOKEN_A"
+
+  # --- 管理員：一覽＋停權 ---
+  expect "$tag 非管理員看店→403" 403 GET /admin/shops "$TOKEN_NEW"
+  expect "$tag 店家一覽" 200 GET /admin/shops "$TOKEN_A"
+  [ "$(jget "$TMP/body.json" "len(d)")" -ge 1 ] && ok "$tag 有店" || bad "$tag 店一覽" "-"
+  expect "$tag 店家停權" 200 PATCH "/shops/$SHOP" "$TOKEN_A" '{"status":"closed"}'
+  expect "$tag 項目一覽" 200 GET /admin/items "$TOKEN_A"
+  [ "$(jget "$TMP/body.json" "len(d)")" -ge 1 ] && ok "$tag 有項目" || bad "$tag 項目一覽" "-"
+  expect "$tag 項目下架" 200 PATCH "/items/$PID" "$TOKEN_A" '{"status":"off"}'
+  [ "$(jget "$TMP/body.json" "d['status']")" = "off" ] && ok "$tag 下架了" || bad "$tag 下架" "-"
+  expect "$tag 項目恢復" 200 PATCH "/items/$PID" "$TOKEN_A" '{"status":"on"}'
+  expect "$tag 店家恢復" 200 PATCH "/shops/$SHOP" "$TOKEN_A" '{"status":"open"}'
+  expect "$tag 使用者一覽" 200 GET /admin/users "$TOKEN_A"
+  [ "$(jget "$TMP/body.json" "len(d)")" -ge 3 ] && ok "$tag 有使用者" || bad "$tag 使用者一覽" "-"
+  expect "$tag 非管理員看人→403" 403 GET /admin/users "$TOKEN_B"
+  expect "$tag 訂單一覽" 200 GET /admin/orders "$TOKEN_A"
+  [ "$(jget "$TMP/body.json" "len(d)")" -ge 1 ] && ok "$tag 有訂單" || bad "$tag 訂單一覽" "-"
+  expect "$tag 非管理員看單→403" 403 GET /admin/orders "$TOKEN_B"
 
   echo "== $tag 全過 =="
 }

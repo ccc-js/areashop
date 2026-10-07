@@ -8,6 +8,7 @@ import ItemDetail from "./pages/ItemDetail";
 import Orders from "./pages/Orders";
 import Seller from "./pages/Seller";
 import Provider from "./pages/Provider";
+import Admin from "./pages/Admin";
 import { Login, Register } from "./pages/Auth";
 
 function Nav() {
@@ -19,6 +20,7 @@ function Nav() {
       <Link to="/seller">{t("nav.seller")}</Link>
       <Link to="/orders">{t("nav.orders")}</Link>
       <Link to="/provider">{t("nav.provider")}</Link>
+      {user?.role === "admin" && <Link to="/admin">{t("nav.admin")}</Link>}
       <select
         aria-label={t("nav.lang")}
         value={lang}
@@ -76,6 +78,7 @@ export default function App() {
             <Route path="/provider" element={<Provider />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/seller" element={<Seller />} />
+            <Route path="/admin" element={<Admin />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
           </Routes>

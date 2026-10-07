@@ -37,14 +37,50 @@ fn narrow(c: char) -> Option<char> {
 }
 
 fn is_punct(c: char) -> bool {
-    c.is_whitespace() || matches!(c, ',' | '.' | '，' | '。' | '、' | '；' | ';' | '：' | ':' | '！' | '!' | '？' | '?' | '(' | ')' | '（' | '）' | '[' | ']' | '【' | '】' | '"' | '\'' | '「' | '」' | '『' | '』' | '·' | '・' | '-' | '_' | '/' | '~' | '～' | '、')
+    c.is_whitespace()
+        || matches!(
+            c,
+            ',' | '.'
+                | '，'
+                | '。'
+                | '、'
+                | '；'
+                | ';'
+                | '：'
+                | ':'
+                | '！'
+                | '!'
+                | '？'
+                | '?'
+                | '('
+                | ')'
+                | '（'
+                | '）'
+                | '['
+                | ']'
+                | '【'
+                | '】'
+                | '"'
+                | '\''
+                | '「'
+                | '」'
+                | '『'
+                | '』'
+                | '·'
+                | '・'
+                | '-'
+                | '_'
+                | '/'
+                | '~'
+                | '～'
+        )
 }
 
 /// 查詢字串 → tokens（已小寫、去重、保序）
 pub fn tokenize(q: &str) -> Vec<String> {
     let mut tokens: Vec<String> = vec![];
     let mut buf = String::new();
-    let mut push_buf = |buf: &mut String, tokens: &mut Vec<String>| {
+    let push_buf = |buf: &mut String, tokens: &mut Vec<String>| {
         if !buf.is_empty() {
             let t = buf.to_lowercase();
             if !tokens.contains(&t) {
