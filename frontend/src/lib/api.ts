@@ -26,15 +26,18 @@ export interface Area {
   village: string | null;
 }
 
-export interface Product {
+export interface Item {
   id: number;
   shop_id: number;
   title: string;
-  category: string;
+  description: string | null;
   price_cents: number;
-  stock: number;
   unit: string;
   status: string;
+  stock: number | null; // null = 不限量
+  bookable: boolean;
+  cancel_hours: number;
+  notice: string | null;
 }
 
 export interface Shop {
@@ -44,21 +47,20 @@ export interface Shop {
   kind: string;
   address: string | null;
   opening_hours: string | null;
-  pickup_mode: string;
 }
-
-export const PICKUP_LABEL: Record<string, string> = {
-  store: "到店自取",
-  meetup: "約面交",
-  both: "到店／面交皆可",
-};
 
 export interface OrderItem {
   id: number;
   order_id: number;
-  product_id: number;
+  item_id: number;
   qty: number;
   price_cents: number;
+  title?: string; // 明細才有
+}
+
+export interface OrderBuyer {
+  nickname: string;
+  phone: string;
 }
 
 export interface Order {
@@ -66,18 +68,56 @@ export interface Order {
   buyer_id: number;
   shop_id: number;
   status: string;
-  pickup_place: string;
   pickup_at: string | null;
+  date: string | null; // 有值 = 選日期的單
+  window: string | null;
   total_cents: number;
+  remark: string | null;
   items?: OrderItem[];
 }
 
-export const nt = (cents: number) => `NT$${(cents / 100).toLocaleString()}`;
+export interface OrderDetail extends Order {
+  buyer: OrderBuyer;
+  items: OrderItem[];
+}
 
-export const CATEGORY_LABEL: Record<string, string> = {
-  agri: "農產品",
-  poultry: "雞/蛋",
-  beef: "牛肉",
-  dumpling: "水餃",
-  other: "其他",
+// 統一項目：賣東西＋賣服務同一種（stock null = 不限量，bookable = 可選日期）
+export interface TimeWindow {
+  start: string;
+  end: string;
+}
+
+export const windowLabel = (w: TimeWindow) => `${w.start}-${w.end}`;
+
+export interface ItemRule {
+  id: number;
+  item_id: number;
+  weekday: number;
+  open: boolean;
+  windows: TimeWindow[];
+}
+
+export interface ItemDay {
+  date: string;
+  open: boolean;
+  full: boolean;
+  windows: TimeWindow[];
+}
+
+export interface ItemDetail extends Item {
+  rules: ItemRule[];
+  days: ItemDay[];
+}
+
+// YYYY-MM-DD（本地時區）
+export const todayStr = (plus = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + plus);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
 };
+
+export const WEEKDAY_ZH = ["日", "一", "二", "三", "四", "五", "六"];
+
+export const nt = (cents: number) => `NT$${(cents / 100).toLocaleString()}`;

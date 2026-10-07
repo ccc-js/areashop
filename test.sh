@@ -42,6 +42,11 @@ bad()  { FAIL=$((FAIL+1)); echo "  FAIL $1 (HTTP $2) $(cat "$TMP/body.json" 2>/d
 # jget <file> <python expr>：從 JSON 取值（d 為解析結果）
 jget() { python3 -c "import json,sys; d=json.load(open('$1')); print($2)"; }
 
+# fdate <N>：N 天後的 YYYY-MM-DD（macOS BSD date / GNU date 通吃）
+fdate() {
+  if date -v+1d +%F >/dev/null 2>&1; then date -v+"$1"d +%F; else date -d "+$1 days" +%F; fi
+}
+
 # call <METHOD> <PATH> [TOKEN] [DATA] → 回傳 HTTP code，body 存 $TMP/body.json
 call() {
   local method="$1" path="$2" token="${3:-}" data="${4:-}"
@@ -118,35 +123,46 @@ suite() { # suite <標籤>：完整 API 流程，假設是全新 DB（含種子�
   SHOP="$(jget "$TMP/body.json" "d['id']")"
   expect "$tag 我的店" 200 GET /shops "$TOKEN_NEW"
   expect "$tag 開店面店" 200 POST /shops "$TOKEN_NEW" \
-    "{\"name\":\"測試店面\",\"area_id\":$AREA,\"kind\":\"store\",\"address\":\"金城鎮模範街1號\",\"opening_hours\":\"每日 09:00-18:00\",\"pickup_mode\":\"store\"}"
-  [ "$(jget "$TMP/body.json" "d['pickup_mode']")" = "store" ] && ok "$tag 店面 pickup_mode=store" || bad "$tag pickup_mode" "-"
+    "{\"name\":\"測試店面\",\"area_id\":$AREA,\"kind\":\"store\",\"address\":\"金城鎮模範街1號\",\"opening_hours\":\"每日 09:00-18:00\"}"
+  [ "$(jget "$TMP/body.json" "d['address']")" = "金城鎮模範街1號" ] && ok "$tag 店面有地址" || bad "$tag 店面地址" "-"
   expect "$tag 店面無地址→400" 400 POST /shops "$TOKEN_NEW" \
-    "{\"name\":\"無址店\",\"area_id\":$AREA,\"kind\":\"store\",\"pickup_mode\":\"store\"}"
-  expect "$tag 取貨方式亂填→400" 400 POST /shops "$TOKEN_NEW" \
-    "{\"name\":\"亂填店\",\"area_id\":$AREA,\"kind\":\"personal\",\"pickup_mode\":\"drone\"}"
+    "{\"name\":\"無址店\",\"area_id\":$AREA,\"kind\":\"store\"}"
+  expect "$tag 種類亂填→400" 400 POST /shops "$TOKEN_NEW" \
+    "{\"name\":\"亂填店\",\"area_id\":$AREA,\"kind\":\"mall\"}"
 
-  # --- 商品 ---
-  expect "$tag 上架" 200 POST /products "$TOKEN_NEW" \
-    "{\"shop_id\":$SHOP,\"title\":\"測試水餃\",\"category\":\"dumpling\",\"price_cents\":16000,\"stock\":5,\"unit\":\"包\",\"pickup_places\":[],\"images\":[]}"
+  # --- 上架（統一路徑：賣東西 / 賣服務 / 混合同一種） ---
+  expect "$tag 上架商品型" 200 POST /items "$TOKEN_NEW" \
+    "{\"shop_id\":$SHOP,\"title\":\"測試水餃\",\"price_cents\":16000,\"stock\":5,\"unit\":\"包\"}"
   PID="$(jget "$TMP/body.json" "d['id']")"
-  expect "$tag 他人商店上架→403" 403 POST /products "$TOKEN_B" \
-    "{\"shop_id\":$SHOP,\"title\":\"偷渡\",\"category\":\"other\",\"price_cents\":100,\"stock\":1,\"unit\":\"份\",\"pickup_places\":[],\"images\":[]}"
-  expect "$tag 地區商品列表" 200 GET "/products?area_id=$AREA"
-  [ "$(jget "$TMP/body.json" "d['total']")" -ge 1 ] && ok "$tag 列表有商品" || bad "$tag 列表為空" "-"
-  expect "$tag 不分區全縣" 200 GET "/products?county=金門縣"
-  [ "$(jget "$TMP/body.json" "d['total']")" -ge 1 ] && ok "$tag 全縣有商品" || bad "$tag 全縣為空" "-"
-  expect "$tag 不存在的縣→空" 200 GET "/products?county=火星市"
+  expect "$tag 上架服務型" 200 POST /items "$TOKEN_NEW" \
+    "{\"shop_id\":$SHOP,\"title\":\"測試快剪\",\"price_cents\":30000,\"stock\":null,\"bookable\":true}"
+  SID="$(jget "$TMP/body.json" "d['id']")"
+  expect "$tag 上架混合型" 200 POST /items "$TOKEN_NEW" \
+    "{\"shop_id\":$SHOP,\"title\":\"預訂水餃\",\"price_cents\":16000,\"stock\":3,\"unit\":\"包\",\"bookable\":true}"
+  MID="$(jget "$TMP/body.json" "d['id']")"
+  expect "$tag 他人商店上架→403" 403 POST /items "$TOKEN_B" \
+    "{\"shop_id\":$SHOP,\"title\":\"偷渡\",\"price_cents\":100,\"stock\":1}"
+  expect "$tag 無庫存又不可約→400" 400 POST /items "$TOKEN_NEW" \
+    "{\"shop_id\":$SHOP,\"title\":\"爛\",\"price_cents\":100}"
+  expect "$tag 地區列表" 200 GET "/items?area_id=$AREA"
+  [ "$(jget "$TMP/body.json" "d['total']")" -ge 3 ] && ok "$tag 列表有3項" || bad "$tag 列表" "-"
+  expect "$tag 不分區全縣" 200 GET "/items?county=金門縣"
+  [ "$(jget "$TMP/body.json" "d['total']")" -ge 1 ] && ok "$tag 全縣有項目" || bad "$tag 全縣為空" "-"
+  expect "$tag 不存在的縣→空" 200 GET "/items?county=火星市"
   [ "$(jget "$TMP/body.json" "d['total']")" = "0" ] && ok "$tag 不存在的縣回空" || bad "$tag 不存在的縣應回空" "-"
+  expect "$tag 只看可預約" 200 GET "/items?shop_id=$SHOP&bookable=true"
+  [ "$(jget "$TMP/body.json" "d['total']")" = "2" ] && ok "$tag 2個可預約" || bad "$tag bookable篩選" "-"
 
-  # --- 訂單：正常流程 ---
+  # --- 訂單：直接買正常流程 ---
   expect "$tag 下單" 200 POST /orders "$TOKEN_B" \
-    "{\"items\":[{\"product_id\":$PID,\"qty\":2}],\"pickup_place\":\"區公所前\"}"
+    "{\"items\":[{\"item_id\":$PID,\"qty\":2}]}"
   OID="$(jget "$TMP/body.json" "d['id']")"
   [ "$(jget "$TMP/body.json" "d['status']")" = "pending" ] && ok "$tag 新單 pending" || bad "$tag 新單狀態" "-"
-  expect "$tag 庫存扣了" 200 GET "/products/$PID"
+  [ "$(jget "$TMP/body.json" "d['buyer']['nickname']")" != "" ] && ok "$tag 明細有買家" || bad "$tag 買家" "-"
+  expect "$tag 庫存扣了" 200 GET "/items/$PID"
   [ "$(jget "$TMP/body.json" "d['stock']")" = "3" ] && ok "$tag 庫存 5→3" || bad "$tag 庫存未扣" "-"
   expect "$tag 超賣→400" 400 POST /orders "$TOKEN_B" \
-    "{\"items\":[{\"product_id\":$PID,\"qty\":99}],\"pickup_place\":\"區公所前\"}"
+    "{\"items\":[{\"item_id\":$PID,\"qty\":99}]}"
   expect "$tag 買家confirm→403" 403 PATCH "/orders/$OID" "$TOKEN_B" '{"action":"confirm"}'
   expect "$tag 賣家confirm" 200 PATCH "/orders/$OID" "$TOKEN_NEW" '{"action":"confirm"}'
   [ "$(jget "$TMP/body.json" "d['status']")" = "confirmed" ] && ok "$tag confirmed" || bad "$tag confirm狀態" "-"
@@ -157,12 +173,130 @@ suite() { # suite <標籤>：完整 API 流程，假設是全新 DB（含種子�
 
   # --- 訂單：取消回補 ---
   expect "$tag 再下一單" 200 POST /orders "$TOKEN_B" \
-    "{\"items\":[{\"product_id\":$PID,\"qty\":1}],\"pickup_place\":\"區公所前\"}"
+    "{\"items\":[{\"item_id\":$PID,\"qty\":1}]}"
   OID2="$(jget "$TMP/body.json" "d['id']")"
   expect "$tag 取消" 200 PATCH "/orders/$OID2" "$TOKEN_B" '{"action":"cancel"}'
   [ "$(jget "$TMP/body.json" "d['status']")" = "cancelled" ] && ok "$tag cancelled" || bad "$tag cancel狀態" "-"
-  expect "$tag 庫存回補" 200 GET "/products/$PID"
+  expect "$tag 庫存回補" 200 GET "/items/$PID"
   [ "$(jget "$TMP/body.json" "d['stock']")" = "3" ] && ok "$tag 庫存回到3" || bad "$tag 庫存未回補" "-"
+
+  # --- 訂單：不限量下大單不擋 ---
+  expect "$tag 服務型下99件" 200 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":99}]}"
+  [ "$(jget "$TMP/body.json" "d['total_cents']")" = "2970000" ] && ok "$tag 金額對" || bad "$tag 金額" "-"
+
+  # --- 訂單：選日期（預約同一套） ---
+  WIN='{"start":"09:00","end":"12:00"}'
+  expect "$tag 設週範本全開" 200 PUT "/items/$SID/rules" "$TOKEN_NEW" \
+    "{\"weekly\":[{\"weekday\":0,\"open\":true,\"windows\":[$WIN]},{\"weekday\":1,\"open\":true,\"windows\":[$WIN]},{\"weekday\":2,\"open\":true,\"windows\":[$WIN]},{\"weekday\":3,\"open\":true,\"windows\":[$WIN]},{\"weekday\":4,\"open\":true,\"windows\":[$WIN]},{\"weekday\":5,\"open\":true,\"windows\":[$WIN]},{\"weekday\":6,\"open\":true,\"windows\":[$WIN]}]}"
+  expect "$tag 混合型設範本" 200 PUT "/items/$MID/rules" "$TOKEN_NEW" \
+    "{\"weekly\":[{\"weekday\":0,\"open\":true,\"windows\":[$WIN]},{\"weekday\":1,\"open\":true,\"windows\":[$WIN]},{\"weekday\":2,\"open\":true,\"windows\":[$WIN]},{\"weekday\":3,\"open\":true,\"windows\":[$WIN]},{\"weekday\":4,\"open\":true,\"windows\":[$WIN]},{\"weekday\":5,\"open\":true,\"windows\":[$WIN]},{\"weekday\":6,\"open\":true,\"windows\":[$WIN]}]}"
+  expect "$tag 爛weekday→400" 400 PUT "/items/$SID/rules" "$TOKEN_NEW" \
+    '{"weekly":[{"weekday":9,"open":true,"windows":[]}]}'
+  expect "$tag 爛時段→400" 400 PUT "/items/$SID/rules" "$TOKEN_NEW" \
+    '{"weekly":[{"weekday":1,"open":true,"windows":[{"start":"","end":"09:00"}]}]}'
+  expect "$tag 他人設範本→403" 403 PUT "/items/$SID/rules" "$TOKEN_B" \
+    '{"weekly":[{"weekday":1,"open":true,"windows":[]}]}'
+
+  D1="$(fdate 2)"; M1="${D1:0:7}"
+  expect "$tag 選日期下單" 200 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"$D1\",\"window\":\"09:00-12:00\"}"
+  [ "$(jget "$TMP/body.json" "d['status']")" = "pending" ] && ok "$tag 預約單 pending" || bad "$tag 預約單狀態" "-"
+  [ "$(jget "$TMP/body.json" "d['date']")" = "$D1" ] && ok "$tag 有日期" || bad "$tag 日期" "-"
+  AID="$(jget "$TMP/body.json" "d['id']")"
+  expect "$tag 同人同日同項目→400" 400 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"$D1\"}"
+  expect "$tag 同日多人可約" 200 POST /orders "$TOKEN_S" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"$D1\"}"
+  expect "$tag 不可約項目帶日期→400" 400 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$PID,\"qty\":1}],\"date\":\"$D1\"}"
+  expect "$tag 過去日期→400" 400 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"2000-01-01\"}"
+  expect "$tag 亂填日期→400" 400 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"明天\"}"
+  expect "$tag 亂填區段→400" 400 POST /orders "$TOKEN_S" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"$(fdate 9)\",\"window\":\"半夜\"}"
+  expect "$tag 訂單明細" 200 GET "/orders/$AID" "$TOKEN_B"
+  [ "$(jget "$TMP/body.json" "d['items'][0]['title']")" = "測試快剪" ] && ok "$tag 品名對" || bad "$tag 品名" "-"
+  expect "$tag 他人看單→403" 403 GET "/orders/$AID" "$TOKEN_S"
+  expect "$tag 買家confirm→403" 403 PATCH "/orders/$AID" "$TOKEN_B" '{"action":"confirm"}'
+  expect "$tag 賣家confirm" 200 PATCH "/orders/$AID" "$TOKEN_NEW" '{"action":"confirm"}'
+  expect "$tag 跳過ready直接完成" 200 PATCH "/orders/$AID" "$TOKEN_NEW" '{"action":"complete"}'
+  [ "$(jget "$TMP/body.json" "d['status']")" = "completed" ] && ok "$tag 預約completed" || bad "$tag complete狀態" "-"
+  expect "$tag 已完成再取消→400" 400 PATCH "/orders/$AID" "$TOKEN_NEW" '{"action":"cancel"}'
+
+  # --- 訂單：爽約＋取消期限 ---
+  D2="$(fdate 3)"
+  expect "$tag 再約一筆" 200 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"$D2\"}"
+  AID2="$(jget "$TMP/body.json" "d['id']")"
+  expect "$tag 買家noshow→403" 403 PATCH "/orders/$AID2" "$TOKEN_B" '{"action":"noshow"}'
+  expect "$tag 賣家confirm2" 200 PATCH "/orders/$AID2" "$TOKEN_NEW" '{"action":"confirm"}'
+  expect "$tag 記爽約" 200 PATCH "/orders/$AID2" "$TOKEN_NEW" '{"action":"noshow"}'
+  [ "$(jget "$TMP/body.json" "d['status']")" = "noshow" ] && ok "$tag noshow" || bad "$tag noshow狀態" "-"
+  expect "$tag 建高門檻項目" 200 POST /items "$TOKEN_NEW" \
+    "{\"shop_id\":$SHOP,\"title\":\"高門檻\",\"price_cents\":100,\"bookable\":true,\"cancel_hours\":720}"
+  HID="$(jget "$TMP/body.json" "d['id']")"
+  expect "$tag 高門檻設範本" 200 PUT "/items/$HID/rules" "$TOKEN_NEW" \
+    '{"weekly":[{"weekday":0,"open":true,"windows":[]},{"weekday":1,"open":true,"windows":[]},{"weekday":2,"open":true,"windows":[]},{"weekday":3,"open":true,"windows":[]},{"weekday":4,"open":true,"windows":[]},{"weekday":5,"open":true,"windows":[]},{"weekday":6,"open":true,"windows":[]}]}'
+  D3="$(fdate 4)"
+  expect "$tag 政策內下單" 200 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$HID,\"qty\":1}],\"date\":\"$D3\"}"
+  AID3="$(jget "$TMP/body.json" "d['id']")"
+  expect "$tag 太晚取消→422" 422 PATCH "/orders/$AID3" "$TOKEN_B" '{"action":"cancel"}'
+  D4="$(fdate 5)"
+  expect "$tag 正常預約" 200 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"$D4\"}"
+  AID4="$(jget "$TMP/body.json" "d['id']")"
+  expect "$tag 買家取消" 200 PATCH "/orders/$AID4" "$TOKEN_B" '{"action":"cancel"}'
+  [ "$(jget "$TMP/body.json" "d['status']")" = "cancelled" ] && ok "$tag 預約cancelled" || bad "$tag cancel狀態" "-"
+  expect "$tag 取消後可重約" 200 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"$D4\"}"
+
+  # --- 訂單：混合型（有庫存＋有日期一起扣） ---
+  D5="$(fdate 6)"
+  expect "$tag 混合下單" 200 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$MID,\"qty\":2}],\"date\":\"$D5\"}"
+  expect "$tag 混合庫存扣了" 200 GET "/items/$MID"
+  [ "$(jget "$TMP/body.json" "d['stock']")" = "1" ] && ok "$tag 混合庫存 3→1" || bad "$tag 混合庫存" "-"
+
+  # --- 單日例外 ---
+  D6="$(fdate 7)"
+  expect "$tag 單日關閉" 200 POST "/items/$SID/exceptions" "$TOKEN_NEW" \
+    "{\"date\":\"$D6\",\"open\":false}"
+  expect "$tag 公休日→400" 400 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"$D6\"}"
+  expect "$tag 刪例外回範本" 200 DELETE "/items/$SID/exceptions/$D6" "$TOKEN_NEW"
+  expect "$tag 恢復可約" 200 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"$D6\"}"
+  D7="$(fdate 8)"
+  expect "$tag 單日勾額滿" 200 POST "/items/$SID/exceptions" "$TOKEN_NEW" \
+    "{\"date\":\"$D7\",\"open\":true,\"full\":true,\"note\":\"人手不足\"}"
+  expect "$tag 額滿日→400" 400 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"$D7\"}"
+  expect "$tag 取消額滿" 200 POST "/items/$SID/exceptions" "$TOKEN_NEW" \
+    "{\"date\":\"$D7\",\"open\":true,\"full\":false}"
+  expect "$tag 恢復可約2" 200 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"$D7\"}"
+
+  # --- 列表＋月曆 ---
+  expect "$tag 本店項目" 200 GET "/items?shop_id=$SHOP"
+  [ "$(jget "$TMP/body.json" "d['total']")" -ge 4 ] && ok "$tag 有4個項目" || bad "$tag 項目列表" "-"
+  expect "$tag 項目月曆" 200 GET "/items/$SID?month=$M1"
+  [ "$(jget "$TMP/body.json" "len(d['days'])")" -ge 28 ] && ok "$tag 月曆天數" || bad "$tag 月曆" "-"
+  expect "$tag 非預約無月曆" 200 GET "/items/$PID?month=$M1"
+  [ "$(jget "$TMP/body.json" "len(d['days'])")" = "0" ] && ok "$tag 無days" || bad "$tag days應空" "-"
+  expect "$tag 爛月份→400" 400 GET "/items/$SID?month=2026-13"
+  expect "$tag 賣家訂單列表" 200 GET "/orders?role=seller" "$TOKEN_NEW"
+  expect "$tag 有日期篩選" 200 GET "/orders?role=seller&from=$D1&to=$D1" "$TOKEN_NEW"
+  [ "$(jget "$TMP/body.json" "len(d)")" -ge 2 ] && ok "$tag 當日有單" || bad "$tag 日期篩選" "-"
+  expect "$tag 店家月曆" 200 GET "/provider/calendar?shop_id=$SHOP&month=$M1" "$TOKEN_NEW"
+  expect "$tag 他人看月曆→403" 403 GET "/provider/calendar?shop_id=$SHOP&month=$M1" "$TOKEN_B"
+  expect "$tag 下架項目" 200 PATCH "/items/$SID" "$TOKEN_NEW" '{"status":"off"}'
+  expect "$tag 下架不可買→400" 400 POST /orders "$TOKEN_S" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}]}"
+  expect "$tag 下架不可約→400" 400 POST /orders "$TOKEN_S" \
+    "{\"items\":[{\"item_id\":$SID,\"qty\":1}],\"date\":\"$(fdate 10)\"}"
 
   echo "== $tag 全過 =="
 }

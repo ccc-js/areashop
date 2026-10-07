@@ -1,11 +1,11 @@
 pub mod areas;
 pub mod auth_routes;
+pub mod items;
 pub mod orders;
-pub mod products;
 pub mod shops;
 
 use axum::{
-    routing::{get, post},
+    routing::{get, post, put},
     Router,
 };
 
@@ -26,18 +26,23 @@ pub fn v1_router() -> Router<AppState> {
         // shops
         .route("/shops", post(shops::create).get(shops::list_mine))
         .route("/shops/:id", get(shops::get_one).patch(shops::update))
-        // products
-        .route("/products", post(products::create).get(products::list))
+        // items（統一項目：賣東西＋賣服務同一種，不分兩類）
+        .route("/items", post(items::create).get(items::list))
+        .route("/items/:id", get(items::get_one).patch(items::update))
+        .route("/items/:id/rules", put(items::put_rules))
+        .route("/items/:id/exceptions", post(items::post_exception))
         .route(
-            "/products/:id",
-            get(products::get_one).patch(products::update),
+            "/items/:id/exceptions/:date",
+            axum::routing::delete(items::delete_exception),
         )
-        // orders
+        // orders（統一訂單：直接買＋選日期同一套；date 有值 = 預約）
         .route("/orders", post(orders::create).get(orders::list))
         .route(
             "/orders/:id",
             get(orders::get_one).patch(orders::transition),
         )
+        // provider calendar（有日期的單，按日聚合）
+        .route("/provider/calendar", get(orders::calendar))
 }
 
 async fn healthz() -> &'static str {

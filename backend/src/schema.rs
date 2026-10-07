@@ -5,7 +5,9 @@
 
 use sea_orm::{sea_query::*, ConnectionTrait, DbConn, DbErr};
 
-use crate::entities::{area, order, order_item, product, shop, user};
+use crate::entities::{
+    area, availability_exception, availability_rule, item, order, order_item, shop, user,
+};
 
 pub async fn setup_schema(db: &DbConn) -> Result<(), DbErr> {
     let schema = sea_orm::Schema::new(db.get_database_backend());
@@ -29,8 +31,9 @@ pub async fn setup_schema(db: &DbConn) -> Result<(), DbErr> {
             .create_table_from_entity(shop::Entity)
             .if_not_exists()
             .to_owned(),
+        // 統一項目（舊 products/services 表不再使用，改版需 --reseed）
         schema
-            .create_table_from_entity(product::Entity)
+            .create_table_from_entity(item::Entity)
             .if_not_exists()
             .to_owned(),
         schema
@@ -39,6 +42,14 @@ pub async fn setup_schema(db: &DbConn) -> Result<(), DbErr> {
             .to_owned(),
         schema
             .create_table_from_entity(order_item::Entity)
+            .if_not_exists()
+            .to_owned(),
+        schema
+            .create_table_from_entity(availability_rule::Entity)
+            .if_not_exists()
+            .to_owned(),
+        schema
+            .create_table_from_entity(availability_exception::Entity)
             .if_not_exists()
             .to_owned(),
     ] {
@@ -53,34 +64,24 @@ pub async fn setup_schema(db: &DbConn) -> Result<(), DbErr> {
     addr.text();
     let mut hours = ColumnDef::new(Alias::new("opening_hours"));
     hours.text();
-    let mut mode = ColumnDef::new(Alias::new("pickup_mode"));
-    mode.string().not_null().default("meetup");
-    for def in [addr, hours, mode] {
-        let alter = Table::alter()
-            .table(Alias::new("shops"))
-            .add_column(def)
-            .to_owned();
-        let builder = db.get_database_backend();
-        match db.execute(builder.build(&alter)).await {
-            Ok(_) => {}
-            Err(e) => {
-                let msg = e.to_string();
-                if msg.contains("already exists") || msg.contains("duplicate column") {
-                    // 欄位已在，無需處理
-                } else {
-                    return Err(e);
-                }
-            }
-        }
+    for def in [addr, hours] {
+        add_column_if_missing(db, "shops", def).await?;
     }
+    // v0.2 簡化：例外改 full 旗標（舊庫的 capacity_override 留著不用）
+    let mut full = ColumnDef::new(Alias::new("full"));
+    full.boolean().not_null().default(false);
+    add_column_if_missing(db, "availability_exceptions", full).await?;
 
-    // 補索引（products 列表最常用；建表語句不含 index，這裡跨 DB 通用）
+    // 補索引（items 列表最常用；建表語句不含 index，這裡跨 DB 通用）
     for (table, col) in [
-        ("products", "shop_id"),
-        ("products", "status"),
+        ("items", "shop_id"),
+        ("items", "status"),
         ("shops", "area_id"),
         ("orders", "buyer_id"),
         ("orders", "shop_id"),
+        ("availability_rules", "item_id"),
+        ("availability_exceptions", "item_id"),
+        ("order_items", "order_id"),
     ] {
         let idx = Index::create()
             .if_not_exists()
@@ -91,6 +92,31 @@ pub async fn setup_schema(db: &DbConn) -> Result<(), DbErr> {
         let builder = db.get_database_backend();
         let _ = db.execute(builder.build(&idx)).await;
     }
+    // 唯一索引：週範本一天一條、例外一天一條
+    for (name, table, cols) in [
+        (
+            "uq_rules_item_weekday",
+            "availability_rules",
+            vec!["item_id", "weekday"],
+        ),
+        (
+            "uq_exc_item_date",
+            "availability_exceptions",
+            vec!["item_id", "date"],
+        ),
+    ] {
+        let mut create = Index::create();
+        create
+            .if_not_exists()
+            .unique()
+            .name(name)
+            .table(Alias::new(table));
+        for c in cols {
+            create.col(Alias::new(c));
+        }
+        let builder = db.get_database_backend();
+        let _ = db.execute(builder.build(&create)).await;
+    }
     Ok(())
 }
 
@@ -98,4 +124,24 @@ async fn create_if_not_exists(db: &DbConn, stmt: TableCreateStatement) -> Result
     let builder = db.get_database_backend();
     db.execute(builder.build(&stmt)).await?;
     Ok(())
+}
+
+async fn add_column_if_missing(db: &DbConn, table: &str, def: ColumnDef) -> Result<(), DbErr> {
+    let alter = Table::alter()
+        .table(Alias::new(table))
+        .add_column(def)
+        .to_owned();
+    let builder = db.get_database_backend();
+    match db.execute(builder.build(&alter)).await {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("already exists") || msg.contains("duplicate column") {
+                // 欄位已在，無需處理
+                Ok(())
+            } else {
+                Err(e)
+            }
+        }
+    }
 }

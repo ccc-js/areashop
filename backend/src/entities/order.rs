@@ -8,10 +8,13 @@ pub struct Model {
     pub id: i32,
     pub buyer_id: i32,
     pub shop_id: i32,
-    /// pending | confirmed | ready | completed | cancelled
+    /// pending | confirmed | ready | completed | cancelled | noshow
     pub status: String,
-    pub pickup_place: String,
     pub pickup_at: Option<String>,
+    /// 預約日期 YYYY-MM-DD；None = 直接買（面交約時間）
+    pub date: Option<String>,
+    /// 區段文字（有日期時，買家從當日 windows 選一個，可空）
+    pub window: Option<String>,
     pub total_cents: i32,
     pub remark: Option<String>,
     pub created_at: ChronoDateTimeUtc,
@@ -22,13 +25,17 @@ pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
 
-// ---- 訂單狀態機（與 DB 無關，可單元測試） ----
+// ---- 統一訂單狀態機（商品＋預約同一套，與 DB 無關，可單元測試） ----
+// 直接買：pending → confirmed → ready → completed
+// 選日期：pending → confirmed → completed（可跳過 ready）
+// 取消：pending/confirmed/ready → cancelled；爽約：confirmed/ready → noshow（店主記）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OrderAction {
     Confirm,
     Ready,
     Complete,
     Cancel,
+    Noshow,
 }
 
 pub fn next_status(current: &str, action: OrderAction) -> Option<&'static str> {
@@ -36,9 +43,12 @@ pub fn next_status(current: &str, action: OrderAction) -> Option<&'static str> {
         ("pending", OrderAction::Confirm) => Some("confirmed"),
         ("pending", OrderAction::Cancel) => Some("cancelled"),
         ("confirmed", OrderAction::Ready) => Some("ready"),
+        ("confirmed", OrderAction::Complete) => Some("completed"),
         ("confirmed", OrderAction::Cancel) => Some("cancelled"),
+        ("confirmed", OrderAction::Noshow) => Some("noshow"),
         ("ready", OrderAction::Complete) => Some("completed"),
         ("ready", OrderAction::Cancel) => Some("cancelled"),
+        ("ready", OrderAction::Noshow) => Some("noshow"),
         _ => None,
     }
 }
@@ -59,6 +69,16 @@ mod tests {
             next_status("ready", OrderAction::Complete),
             Some("completed")
         );
+        // 預約可跳過 ready 直接完成
+        assert_eq!(
+            next_status("confirmed", OrderAction::Complete),
+            Some("completed")
+        );
+        assert_eq!(
+            next_status("confirmed", OrderAction::Noshow),
+            Some("noshow")
+        );
+        assert_eq!(next_status("pending", OrderAction::Noshow), None);
         assert_eq!(next_status("completed", OrderAction::Cancel), None);
     }
 }

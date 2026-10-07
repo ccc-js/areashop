@@ -18,8 +18,6 @@ pub struct Model {
     pub address: Option<String>,
     /// 營業時間（有店面才填，如：週二至週日 09:00-18:00）
     pub opening_hours: Option<String>,
-    /// 取貨方式：store（到店）| meetup（約面交）| both（皆可）
-    pub pickup_mode: String,
     /// open | closed | banned
     pub status: String,
     pub created_at: ChronoDateTimeUtc,

@@ -41,3 +41,18 @@ input, select { font-size: 1.05rem; padding: 0.6rem; border: 1px solid var(--lin
 .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.8rem; }
 .tabs button { background: #e8e4d8; color: var(--ink); }
 .tabs button.on { background: var(--brand); color: #fff; }
+/* v0.2：月曆選日期 */
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.35rem; margin: 0.6rem 0; }
+.day { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 0.35rem 0.1rem; font-size: 0.85rem; color: var(--ink); }
+.day .wd { font-size: 0.72rem; color: var(--muted); }
+.day:disabled { opacity: 0.45; }
+.day.sel { border: 2px solid var(--brand); }
+.day.off { background: #eee9dd; }
+.day.full { background: #f3d9d9; }
+button.mini { padding: 0.2rem 0.6rem; font-size: 0.9rem; margin-left: 0.4rem; }
+.toast {
+  position: fixed; left: 50%; bottom: 2rem; transform: translateX(-50%);
+  background: #2b2b2b; color: #fff; border-radius: 12px;
+  padding: 0.8rem 1.4rem; font-size: 1.1rem; z-index: 99;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+}

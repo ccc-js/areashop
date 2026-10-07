@@ -1,24 +1,49 @@
 import { useEffect, useState } from "react";
-import { api, nt, type Order } from "../lib/api";
+import { api, nt, type Order, type OrderDetail } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
-const NEXT: Record<string, { action: string; label: string; by: string }[]> = {
-  pending: [{ action: "confirm", label: "確認接單", by: "seller" }],
-  confirmed: [{ action: "ready", label: "可面交", by: "seller" }],
-  ready: [{ action: "complete", label: "完成", by: "any" }],
+// 狀態機：pending → confirmed → ready → completed；confirmed 可跳過 ready 直接完成；
+// confirmed/ready 可記 noshow（店主）。後端擋權限，前端照狀態給按鈕。
+const NEXT: Record<string, { action: string; label: string }[]> = {
+  pending: [{ action: "confirm", label: "確認接單" }],
+  confirmed: [
+    { action: "ready", label: "可面交" },
+    { action: "complete", label: "完成" },
+    { action: "noshow", label: "記爽約" },
+  ],
+  ready: [
+    { action: "complete", label: "完成" },
+    { action: "noshow", label: "記爽約" },
+  ],
 };
+
+const CANCELABLE = ["pending", "confirmed", "ready"];
 
 export default function Orders() {
   const { user } = useAuth();
   const [role, setRole] = useState<"buyer" | "seller">("buyer");
   const [orders, setOrders] = useState<Order[]>([]);
+  // 賣家視角才抓明細（含買家＋品項）
+  const [details, setDetails] = useState<Record<number, OrderDetail>>({});
   const [err, setErr] = useState("");
 
   const load = () =>
     api<Order[]>(`/orders?role=${role}`)
-      .then((o) => {
+      .then(async (o) => {
         setOrders(o);
         setErr("");
+        if (role === "seller") {
+          const ds = await Promise.all(
+            o.map((x) => api<OrderDetail>(`/orders/${x.id}`).catch(() => null))
+          );
+          const m: Record<number, OrderDetail> = {};
+          ds.forEach((d) => {
+            if (d) m[d.id] = d;
+          });
+          setDetails(m);
+        } else {
+          setDetails({});
+        }
       })
       .catch((e) => setErr(String(e)));
 
@@ -46,12 +71,28 @@ export default function Orders() {
       {err && <p className="error">{err}</p>}
       {orders.map((o) => (
         <div key={o.id} className="order">
-          <div>#{o.id} · {o.status} · {nt(o.total_cents)} · 面交：{o.pickup_place}</div>
+          <div>
+            #{o.id} · {o.status} · {nt(o.total_cents)}
+            {o.date && ` · ${o.date}${o.window ? ` ${o.window}` : ""}`}
+          </div>
+          {o.remark && <div className="hint">備註：{o.remark}</div>}
+          {role === "seller" && details[o.id] && (
+            <>
+              <div className="hint">
+                買家：{details[o.id].buyer.nickname}（{details[o.id].buyer.phone}）
+              </div>
+              {details[o.id].items.map((it) => (
+                <div key={it.id}>
+                  {it.title} × {it.qty} · {nt(it.price_cents * it.qty)}
+                </div>
+              ))}
+            </>
+          )}
           <div className="row">
             {(NEXT[o.status] ?? []).map((n) => (
               <button key={n.action} onClick={() => act(o.id, n.action)}>{n.label}</button>
             ))}
-            {["pending", "confirmed", "ready"].includes(o.status) && (
+            {CANCELABLE.includes(o.status) && (
               <button onClick={() => act(o.id, "cancel")}>取消</button>
             )}
           </div>

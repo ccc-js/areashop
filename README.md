@@ -33,7 +33,7 @@ DATABASE_URL=postgres://areashop:areashop@localhost:5432/areashop cargo run
 同一支 binary，不需改程式、不需改 SQL（SeaORM 依連線自動產生對應方言）。
 完整三件套（含前端 nginx）：`docker compose up --build` → web `:3000`、api `:8080`。
 
-## API（v0.1）
+## API（統一模式：賣東西＋賣服務同一種）
 
 | 方法 | 路徑 | 說明 |
 |------|------|------|
@@ -42,13 +42,17 @@ DATABASE_URL=postgres://areashop:areashop@localhost:5432/areashop cargo run
 | GET | /api/v1/areas, /counties, /townships?county=, /search?q= | 地區 |
 | POST/GET | /api/v1/shops | 開店／我的店 |
 | GET/PATCH | /api/v1/shops/:id | 店鋪 |
-| POST/GET | /api/v1/products?area_id=&q=&shop_id= | 上架／列表（預設只看上架中） |
-| GET/PATCH | /api/v1/products/:id | 商品 |
-| POST/GET | /api/v1/orders | 下單（同店、扣庫存）／訂單列表 |
-| GET/PATCH | /api/v1/orders/:id | 詳情／confirm→ready→complete／cancel（取消回補庫存） |
+| POST/GET | /api/v1/items?area_id=&q=&shop_id=&bookable= | 上架／列表（`stock` 空=不限量，`bookable`=可選日期） |
+| GET/PATCH | /api/v1/items/:id | 項目（`?month=` 附可接案月曆） |
+| PUT/POST/DELETE | /api/v1/items/:id/rules, /exceptions[/:date] | 週範本／單日開關（額滿・不營業） |
+| POST/GET | /api/v1/orders | 下單（同店、有庫存扣庫存；`date` 有值=預約）／訂單列表 |
+| GET/PATCH | /api/v1/orders/:id | 詳情（含買家＋品名）／confirm→ready→complete／cancel／noshow |
+| GET | /api/v1/provider/calendar?shop_id=&month= | 店家月曆（有日期的單） |
 
-訂單狀態機：`pending → confirmed → ready → completed ｜ cancelled`，見
+訂單狀態機：`pending → confirmed → ready → completed ｜ cancelled ｜ noshow`（confirmed 可跳過 ready；noshow 限店主），見
 `backend/src/entities/order.rs`（含單元測試）。
+
+⚠️ 統一模式是 breaking change：舊 `products`/`services`/`appointments` 表不再使用，現有開發 DB 請 `./run.sh --reseed`。
 
 ## 目錄
 

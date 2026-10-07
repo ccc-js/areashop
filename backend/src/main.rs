@@ -1,4 +1,5 @@
 mod auth;
+mod booking;
 mod config;
 mod entities;
 mod routes;

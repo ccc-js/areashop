@@ -24,13 +24,6 @@ pub(crate) struct CreateShop {
     address: Option<String>,
     /// 營業時間（有店面才填）
     opening_hours: Option<String>,
-    /// store（到店）| meetup（約面交）| both（皆可），預設 meetup
-    #[serde(default = "default_mode")]
-    pickup_mode: String,
-}
-
-fn default_mode() -> String {
-    "meetup".to_string()
 }
 
 fn default_kind() -> String {
@@ -50,14 +43,11 @@ pub(crate) async fn create(
             "kind must be personal|store".into(),
         ));
     }
-    if !["store", "meetup", "both"].contains(&req.pickup_mode.as_str()) {
+    if req.kind == "store" && req.address.as_deref().unwrap_or("").is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
-            "pickup_mode must be store|meetup|both".into(),
+            "store kind requires address".into(),
         ));
-    }
-    if req.kind == "store" && req.address.as_deref().unwrap_or("").is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "store kind requires address".into()));
     }
     let am = shop::ActiveModel {
         owner_id: Set(auth.id),
@@ -69,7 +59,6 @@ pub(crate) async fn create(
         phone: Set(req.phone),
         address: Set(req.address),
         opening_hours: Set(req.opening_hours),
-        pickup_mode: Set(req.pickup_mode),
         status: Set("open".to_string()),
         created_at: Set(Utc::now()),
         ..Default::default()
@@ -114,7 +103,6 @@ pub(crate) struct UpdateShop {
     phone: Option<String>,
     address: Option<String>,
     opening_hours: Option<String>,
-    pickup_mode: Option<String>, // store | meetup | both
     status: Option<String>, // open | closed
 }
 
@@ -150,12 +138,6 @@ pub(crate) async fn update(
     }
     if let Some(v) = req.opening_hours {
         am.opening_hours = Set(Some(v));
-    }
-    if let Some(v) = req.pickup_mode {
-        if !["store", "meetup", "both"].contains(&v.as_str()) {
-            return Err((StatusCode::BAD_REQUEST, "bad pickup_mode".into()));
-        }
-        am.pickup_mode = Set(v);
     }
     if let Some(v) = req.status {
         if v != "open" && v != "closed" {

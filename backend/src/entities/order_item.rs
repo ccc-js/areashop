@@ -7,7 +7,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub order_id: i32,
-    pub product_id: i32,
+    pub item_id: i32,
     pub qty: i32,
     pub price_cents: i32,
 }
