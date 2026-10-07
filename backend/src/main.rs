@@ -60,6 +60,10 @@ async fn main() -> anyhow::Result<()> {
 
     let app: Router = Router::new()
         .nest("/api/v1", routes::v1_router())
+        .nest_service(
+            "/uploads",
+            tower_http::services::ServeDir::new(routes::uploads::upload_dir()),
+        )
         .layer(CorsLayer::permissive())
         .with_state(state);
 

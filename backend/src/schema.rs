@@ -6,7 +6,8 @@
 use sea_orm::{sea_query::*, ConnectionTrait, DbConn, DbErr};
 
 use crate::entities::{
-    area, availability_exception, availability_rule, item, order, order_item, shop, user,
+    area, availability_exception, availability_rule, item, notification, order, order_item, shop,
+    user,
 };
 
 pub async fn setup_schema(db: &DbConn) -> Result<(), DbErr> {
@@ -52,6 +53,10 @@ pub async fn setup_schema(db: &DbConn) -> Result<(), DbErr> {
             .create_table_from_entity(availability_exception::Entity)
             .if_not_exists()
             .to_owned(),
+        schema
+            .create_table_from_entity(notification::Entity)
+            .if_not_exists()
+            .to_owned(),
     ] {
         create_if_not_exists(db, entity_stmt).await?;
     }
@@ -87,6 +92,7 @@ pub async fn setup_schema(db: &DbConn) -> Result<(), DbErr> {
         ("availability_rules", "item_id"),
         ("availability_exceptions", "item_id"),
         ("order_items", "order_id"),
+        ("notifications", "user_id"),
     ] {
         let idx = Index::create()
             .if_not_exists()

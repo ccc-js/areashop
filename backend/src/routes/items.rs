@@ -55,6 +55,19 @@ fn default_unit() -> String {
     "份".to_string()
 }
 
+/// 圖片：陣列、上限 5 張、每張非空字串（只存 /uploads/... url，不在這裡驗內容）
+fn valid_images(v: &serde_json::Value) -> bool {
+    if v.is_null() {
+        return true;
+    }
+    match v.as_array() {
+        Some(a) => {
+            a.len() <= 5 && a.iter().all(|x| x.as_str().is_some_and(|s| !s.is_empty()))
+        }
+        None => false,
+    }
+}
+
 fn default_cat() -> String {
     "other".to_string()
 }
@@ -84,6 +97,9 @@ pub(crate) async fn create(
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
     if !crate::search::valid_category(&req.category) {
         return Err((StatusCode::BAD_REQUEST, "bad category".into()));
+    }
+    if !valid_images(&req.images) {
+        return Err((StatusCode::BAD_REQUEST, "bad images".into()));
     }
     if let Some(st) = req.stock {
         if st < 0 {
@@ -364,6 +380,7 @@ pub(crate) struct UpdateItem {
     price_cents: Option<i32>,
     category: Option<String>,
     unit: Option<String>,
+    images: Option<serde_json::Value>,
     /// 庫存；配合 unlimited 使用
     stock: Option<i32>,
     /// true = 改為不限量（stock 清掉）
@@ -410,6 +427,16 @@ pub(crate) async fn update(
     }
     if let Some(v) = req.unit {
         am.unit = Set(v);
+    }
+    if let Some(v) = req.images {
+        if !valid_images(&v) {
+            return Err((StatusCode::BAD_REQUEST, "bad images".into()));
+        }
+        am.images = Set(if v.is_null() {
+            serde_json::json!([])
+        } else {
+            v
+        });
     }
     if req.unlimited == Some(true) {
         am.stock = Set(None);

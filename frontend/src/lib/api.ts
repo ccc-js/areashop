@@ -34,6 +34,7 @@ export interface Item {
   price_cents: number;
   category: string; // fresh | food | daily | service | other
   unit: string;
+  images: string[];
   status: string;
   stock: number | null; // null = 不限量
   bookable: boolean;
@@ -46,6 +47,7 @@ export interface Shop {
   name: string;
   area_id: number;
   kind: string;
+  description: string | null;
   address: string | null;
   opening_hours: string | null;
 }

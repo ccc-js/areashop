@@ -9,7 +9,39 @@ import Orders from "./pages/Orders";
 import Seller from "./pages/Seller";
 import Provider from "./pages/Provider";
 import Admin from "./pages/Admin";
+import Shop from "./pages/Shop";
+import Notifications from "./pages/Notifications";
 import { Login, Register } from "./pages/Auth";
+import { api } from "./lib/api";
+
+function Bell() {
+  const { user } = useAuth();
+  const { t } = useLang();
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!user) {
+      setN(0);
+      return;
+    }
+    let alive = true;
+    const poll = () =>
+      api<{ count: number }>("/notifications/unread-count")
+        .then((d) => alive && setN(d.count))
+        .catch(() => {});
+    poll();
+    const timer = setInterval(poll, 30000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [user]);
+  if (!user) return null;
+  return (
+    <Link to="/notifications" className="bell" aria-label={t("nav.notif")}>
+      🔔{n > 0 && <span className="badge">{n > 99 ? "99+" : n}</span>}
+    </Link>
+  );
+}
 
 function Nav() {
   const { user, logout } = useAuth();
@@ -21,6 +53,7 @@ function Nav() {
       <Link to="/orders">{t("nav.orders")}</Link>
       <Link to="/provider">{t("nav.provider")}</Link>
       {user?.role === "admin" && <Link to="/admin">{t("nav.admin")}</Link>}
+      <Bell />
       <select
         aria-label={t("nav.lang")}
         value={lang}
@@ -75,6 +108,8 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/i/:id" element={<ItemDetail />} />
+            <Route path="/shop/:id" element={<Shop />} />
+            <Route path="/notifications" element={<Notifications />} />
             <Route path="/provider" element={<Provider />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/seller" element={<Seller />} />

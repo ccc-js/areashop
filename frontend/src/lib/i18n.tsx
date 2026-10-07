@@ -9,6 +9,7 @@ const dict = {
   "nav.orders": ["訂單", "订单", "Orders"],
   "nav.provider": ["接案管理", "接单管理", "Availability"],
   "nav.admin": ["管理", "管理", "Admin"],
+  "nav.notif": ["通知", "通知", "Notifications"],
   "nav.login": ["登入", "登录", "Log in"],
   "nav.register": ["註冊", "注册", "Sign up"],
   "nav.logout": ["登出", "登出", "Log out"],
@@ -128,6 +129,7 @@ const dict = {
   "seller.needArea": ["請選開店地區", "请选择开店地区", "Select shop area"],
   "seller.opened": ["開店成功！", "开店成功！", "Shop opened!"],
   "seller.myShop": ["我的店：", "我的店：", "My shop: "],
+  "seller.pickShop": ["切換店面", "切换店面", "Switch shop"],
   "seller.settings": ["店鋪設定", "店铺设定", "Shop settings"],
   "seller.updateHours": ["更新營業時間", "更新营业时间", "Update hours"],
   "seller.hoursUpdated": ["營業時間已更新，買家在項目頁看得到。", "营业时间已更新，买家在项目页看得到。", "Hours updated — visible to buyers."],
@@ -137,6 +139,9 @@ const dict = {
   "seller.stockPh": ["庫存（空白 = 不限量）", "库存（空白 = 不限量）", "Stock (blank = unlimited)"],
   "seller.bookable": ["接受選日期預約（設好後去「接案管理」排時間）", "接受选日期预约（设好后去「接单管理」排时间）", "Accept date bookings (then set times in Availability)"],
   "seller.listBtn": ["上架", "上架", "List"],
+  "seller.photos": ["商品照片（最多5張）", "商品照片（最多5张）", "Photos (max 5)"],
+  "seller.photosPicked": ["已選 {n} 張，送出時一起上傳", "已选 {n} 张，送出时一起上传", "{n} selected, uploaded on submit"],
+  "seller.uploading": ["上傳中…", "上传中…", "Uploading…"],
   "seller.listedGo": ["上架成功！去「接案管理」設可接案時間。", "上架成功！去「接单管理」设可接案时间。", "Listed! Set available times in Availability."],
   "seller.listed": ["上架成功！", "上架成功！", "Listed!"],
   "seller.myItems": ["我的項目（{n}）", "我的项目（{n}）", "My items ({n})"],
@@ -189,6 +194,19 @@ const dict = {
   "provider.dayOpen": ["可接", "可接", "Accepting"],
   "provider.dayClosed": ["不營業", "不营业", "Closed"],
   "provider.dayFull": ["額滿", "额满", "Full"],
+
+  "notif.title": ["通知", "通知", "Notifications"],
+  "notif.readAll": ["全部已讀", "全部已读", "Mark all read"],
+  "notif.empty": ["還沒有通知。", "还没有通知。", "No notifications yet."],
+  "notif.created": ["{actor} 下了新訂單 {order}", "{actor} 下了新订单 {order}", "{actor} placed order {order}"],
+  "notif.confirmed": ["{actor} 確認了訂單 {order}", "{actor} 确认了订单 {order}", "{actor} confirmed order {order}"],
+  "notif.ready": ["訂單 {order} 可面交了", "订单 {order} 可面交了", "Order {order} is ready for pickup"],
+  "notif.completed": ["訂單 {order} 已完成", "订单 {order} 已完成", "Order {order} completed"],
+  "notif.cancelled": ["{actor} 取消了訂單 {order}", "{actor} 取消了订单 {order}", "{actor} cancelled order {order}"],
+  "notif.noshow": ["訂單 {order} 被記爽約", "订单 {order} 被记爽约", "Order {order} marked no-show"],
+
+  "shop.items": ["店內項目（{n}）", "店内项目（{n}）", "Items ({n})"],
+  "shop.empty": ["這家店還沒有上架項目。", "这家店还没有上架项目。", "This shop has no items yet."],
 } as const;
 
 export type TKey = keyof typeof dict;

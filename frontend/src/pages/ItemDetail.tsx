@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   api,
   nt,
@@ -77,6 +77,13 @@ export default function ItemDetail() {
     <div className="detail">
       <button className="back" onClick={() => nav(-1)}>{t("item.back")}</button>
       <h2>{d.title}</h2>
+      {d.images.length > 0 && (
+        <div className="thumbs">
+          {d.images.map((u) => (
+            <img key={u} src={u} alt={d.title} loading="lazy" />
+          ))}
+        </div>
+      )}
       <p className="price">{nt(d.price_cents)} / {d.unit}</p>
       {d.description && <p>{d.description}</p>}
       {d.notice && <p className="hint">※ {d.notice}</p>}
@@ -84,7 +91,7 @@ export default function ItemDetail() {
       {d.bookable && <p className="hint">{t("item.freeCancel", { n: d.cancel_hours })}</p>}
       {shop && (
         <div className="order">
-          <div>{t("item.seller")}{shop.name}</div>
+          <div><Link to={`/shop/${shop.id}`}>{t("item.seller")}{shop.name}</Link></div>
           {shop.address && <div>{t("item.address")}{shop.address}</div>}
           {shop.opening_hours && <div>{t("item.hours")}{shop.opening_hours}</div>}
           {!shop.address && <div className="hint">{t("item.noStorefront")}</div>}

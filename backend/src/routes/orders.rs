@@ -291,6 +291,18 @@ pub(crate) async fn create(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .unwrap();
+    // 通知店主：有人下單了（actor = 買家暱稱）
+    let shop = crate::entities::shop::Entity::find_by_id(order.shop_id)
+        .one(&s.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "shop not found".to_string()))?;
+    let buyer = crate::entities::user::Entity::find_by_id(order.buyer_id)
+        .one(&s.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "buyer not found".to_string()))?;
+    crate::routes::notifications::push(&s.db, shop.owner_id, "order_created", order.id, &buyer.nickname).await?;
     Ok(Json(detail(&s.db, order).await?))
 }
 
@@ -485,6 +497,31 @@ pub(crate) async fn transition(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .unwrap();
+    // 通知對方：店主動的 → 買家；買家按取消 → 店主（actor = 操作人暱稱）
+    let me = crate::entities::user::Entity::find_by_id(auth.id)
+        .one(&s.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "user not found".to_string()))?;
+    let target = if is_seller && !is_buyer {
+        m.buyer_id
+    } else if is_buyer && !is_seller {
+        shop.owner_id
+    } else {
+        // 既是買家又是店主（自己買自己）：只通知買家身份
+        m.buyer_id
+    };
+    let kind = match action {
+        OrderAction::Confirm => "confirmed",
+        OrderAction::Ready => "ready",
+        OrderAction::Complete => "completed",
+        OrderAction::Cancel => "cancelled",
+        OrderAction::Noshow => "noshow",
+    };
+    // 自己通知自己就跳過（自己買自己店的邊緣 case）
+    if target != auth.id {
+        crate::routes::notifications::push(&s.db, target, kind, m.id, &me.nickname).await?;
+    }
     Ok(Json(m))
 }
 

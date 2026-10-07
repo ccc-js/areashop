@@ -32,18 +32,15 @@ export default function Orders() {
       .then(async (o) => {
         setOrders(o);
         setErr("");
-        if (role === "seller") {
-          const ds = await Promise.all(
-            o.map((x) => api<OrderDetail>(`/orders/${x.id}`).catch(() => null))
-          );
-          const m: Record<number, OrderDetail> = {};
-          ds.forEach((d) => {
-            if (d) m[d.id] = d;
-          });
-          setDetails(m);
-        } else {
-          setDetails({});
-        }
+        // 買賣雙方都抓明細：買家看品項，賣家多看買家是誰
+        const ds = await Promise.all(
+          o.map((x) => api<OrderDetail>(`/orders/${x.id}`).catch(() => null))
+        );
+        const m: Record<number, OrderDetail> = {};
+        ds.forEach((d) => {
+          if (d) m[d.id] = d;
+        });
+        setDetails(m);
       })
       .catch((e) => setErr(String(e)));
 
@@ -76,11 +73,13 @@ export default function Orders() {
             {o.date && ` · ${o.date}${o.window ? ` ${o.window}` : ""}`}
           </div>
           {o.remark && <div className="hint">{t("orders.remark")}{o.remark}</div>}
-          {role === "seller" && details[o.id] && (
+          {details[o.id] && (
             <>
-              <div className="hint">
-                {t("orders.buyerIs")}{details[o.id].buyer.nickname}（{details[o.id].buyer.phone}）
-              </div>
+              {role === "seller" && (
+                <div className="hint">
+                  {t("orders.buyerIs")}{details[o.id].buyer.nickname}（{details[o.id].buyer.phone}）
+                </div>
+              )}
               {details[o.id].items.map((it) => (
                 <div key={it.id}>
                   {it.title} × {it.qty} · {nt(it.price_cents * it.qty)}

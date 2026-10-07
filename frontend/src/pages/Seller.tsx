@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, nt, type Item } from "../lib/api";
+import { api, nt, token, type Item } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useLang, CATS } from "../lib/i18n";
 import { toast } from "../lib/toast";
@@ -32,23 +32,28 @@ export default function Seller() {
   // 庫存空白 = 不限量（賣服務）；可預約打勾才設時間
   const [stock, setStock] = useState("");
   const [bookable, setBookable] = useState(false);
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [editHours, setEditHours] = useState("");
+  const [shopId, setShopId] = useState(0);
   const [msg, setMsg] = useState("");
+
+  const shop = shops.find((s) => s.id === shopId) ?? shops[0];
 
   const load = () => {
     api<Shop[]>("/shops").then((ss) => {
       setShops(ss);
-      // 沒動過才帶入店家現值；正在輸入或剛存檔的不覆蓋
-      setEditHours((prev) => (prev === "" && ss[0] ? ss[0].opening_hours ?? "" : prev));
+      // 留在原本選的店；首次或店沒了才選第一家
+      setShopId((prev) => (prev && ss.some((s) => s.id === prev) ? prev : ss[0]?.id ?? 0));
     }).catch(() => {});
   };
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (shops[0]) {
-      api<{ items: Item[] }>(`/items?shop_id=${shops[0].id}`).then((d) => setItems(d.items)).catch(() => {});
-    }
-  }, [shops]);
+    if (!shop) return;
+    api<{ items: Item[] }>(`/items?shop_id=${shop.id}`).then((d) => setItems(d.items)).catch(() => {});
+    setEditHours(shop.opening_hours ?? "");
+  }, [shops, shopId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!user) return <p>{t("common.loginFirstShop")}</p>;
 
@@ -82,9 +87,9 @@ export default function Seller() {
   };
 
   const saveHours = async () => {
-    if (!shops[0]) return;
+    if (!shop) return;
     try {
-      await api(`/shops/${shops[0].id}`, {
+      await api(`/shops/${shop.id}`, {
         method: "PATCH",
         body: JSON.stringify({ opening_hours: editHours }),
       });
@@ -96,8 +101,22 @@ export default function Seller() {
     }
   };
 
+  const uploadPhotos = async (): Promise<string[]> => {
+    if (photos.length === 0) return [];
+    const base = import.meta.env.VITE_API_URL ?? "/api/v1";
+    const fd = new FormData();
+    photos.slice(0, 5).forEach((f) => fd.append("files", f));
+    const headers: Record<string, string> = {};
+    const t = token();
+    if (t) headers["Authorization"] = `Bearer ${t}`;
+    const res = await fetch(`${base}/uploads`, { method: "POST", headers, body: fd });
+    if (!res.ok) throw new Error(await res.text());
+    const arr = (await res.json()) as { url: string }[];
+    return arr.map((x) => x.url);
+  };
+
   const addItem = async () => {
-    if (!shops[0]) {
+    if (!shop) {
       setMsg(t("seller.openFirst"));
       return;
     }
@@ -114,31 +133,38 @@ export default function Seller() {
       return;
     }
     try {
+      setUploading(true);
+      const urls = await uploadPhotos();
       await api("/items", {
         method: "POST",
         body: JSON.stringify({
-          shop_id: shops[0].id,
+          shop_id: shop.id,
           title,
           price_cents: Math.round(Number(price) * 100),
           category,
           stock: stock.trim() === "" ? null : Number(stock),
           unit: "份",
           bookable,
+          images: urls,
         }),
       });
       setTitle("");
+      setPhotos([]);
       setMsg(bookable ? t("seller.listedGo") : t("seller.listed"));
-      const d = await api<{ items: Item[] }>(`/items?shop_id=${shops[0].id}`);
+      const d = await api<{ items: Item[] }>(`/items?shop_id=${shop.id}`);
       setItems(d.items);
     } catch (e) {
       setMsg(String(e));
+    } finally {
+      setUploading(false);
     }
   };
 
   const takeOff = async (id: number) => {
+    if (!shop) return;
     try {
       await api(`/items/${id}`, { method: "PATCH", body: JSON.stringify({ status: "off" }) });
-      const d = await api<{ items: Item[] }>(`/items?shop_id=${shops[0].id}`);
+      const d = await api<{ items: Item[] }>(`/items?shop_id=${shop.id}`);
       setItems(d.items);
     } catch (e) {
       setMsg(String(e));
@@ -148,7 +174,7 @@ export default function Seller() {
   return (
     <div>
       <h2>{t("seller.title")}</h2>
-      {shops.length === 0 ? (
+      {!shop ? (
         <div className="form">
           <h3>{t("seller.open10")}</h3>
           <input value={shopName} onChange={(e) => setShopName(e.target.value)} placeholder={t("seller.shopNamePh")} />
@@ -184,10 +210,20 @@ export default function Seller() {
         </div>
       ) : (
         <>
-          <p>{t("seller.myShop")}{shops[0].name}</p>
+          <p>{t("seller.myShop")}{shop.name}</p>
+          {shops.length > 1 && (
+            <label>
+              {t("seller.pickShop")}
+              <select value={shop.id} onChange={(e) => setShopId(Number(e.target.value))}>
+                {shops.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <div className="form">
             <h3>{t("seller.settings")}</h3>
-            <input value={editHours} onChange={(e) => setEditHours(e.target.value)} placeholder={shops[0].kind === "store" ? t("seller.hoursPhStore") : t("seller.hoursPhMeet")} />
+            <input value={editHours} onChange={(e) => setEditHours(e.target.value)} placeholder={shop.kind === "store" ? t("seller.hoursPhStore") : t("seller.hoursPhMeet")} />
             <button onClick={saveHours}>{t("seller.updateHours")}</button>
           </div>
           <div className="form">
@@ -204,10 +240,22 @@ export default function Seller() {
             </label>
             <input value={stock} onChange={(e) => setStock(e.target.value)} placeholder={t("seller.stockPh")} />
             <label>
+              {t("seller.photos")}
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => setPhotos(Array.from(e.target.files ?? []).slice(0, 5))}
+              />
+            </label>
+            {photos.length > 0 && (
+              <div className="hint">{t("seller.photosPicked", { n: photos.length })}</div>
+            )}
+            <label>
               <input type="checkbox" checked={bookable} onChange={(e) => setBookable(e.target.checked)} />
               {t("seller.bookable")}
             </label>
-            <button onClick={addItem}>{t("seller.listBtn")}</button>
+            <button onClick={addItem} disabled={uploading}>{uploading ? t("seller.uploading") : t("seller.listBtn")}</button>
           </div>
           <h3>{t("seller.myItems", { n: items.length })}</h3>
           {items.map((p) => (

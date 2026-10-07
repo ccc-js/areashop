@@ -2,8 +2,10 @@ pub mod admin;
 pub mod areas;
 pub mod auth_routes;
 pub mod items;
+pub mod notifications;
 pub mod orders;
 pub mod shops;
+pub mod uploads;
 
 use axum::{
     routing::{get, post, put},
@@ -44,6 +46,12 @@ pub fn v1_router() -> Router<AppState> {
         )
         // provider calendar（有日期的單，按日聚合）
         .route("/provider/calendar", get(orders::calendar))
+        // uploads（商品圖，需登入）
+        .route("/uploads", post(uploads::create))
+        // notifications（站內通知鈴鐺，本人）
+        .route("/notifications", get(notifications::list))
+        .route("/notifications/unread-count", get(notifications::unread_count))
+        .route("/notifications/read", post(notifications::mark_read))
         // admin（管理員介面；一覽唯讀，停權/下架沿用 PATCH）
         .route("/admin/areas", post(admin::create_area))
         .route(

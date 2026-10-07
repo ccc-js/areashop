@@ -81,7 +81,7 @@ start_server() { # start_server <DATABASE_URL>
   done
   sleep 1
   rm -f "$TMP/server.log"
-  DATABASE_URL="$1" PORT="$PORT" SEED=1 nohup "$BIN" >"$TMP/server.log" 2>&1 &
+  DATABASE_URL="$1" PORT="$PORT" SEED=1 UPLOAD_DIR="$TMP/up" nohup "$BIN" >"$TMP/server.log" 2>&1 &
   SRV_PID=$!
   wait_for
 }
@@ -133,6 +133,17 @@ suite() { # suite <標籤>：完整 API 流程，假設是全新 DB（含種子�
     "{\"name\":\"亂填店\",\"area_id\":$AREA,\"kind\":\"mall\"}"
 
   # --- 上架（統一路徑：賣東西 / 賣服務 / 混合同一種） ---
+  # 最小合法 png（1x1）＋假圖＋超大檔
+  python3 -c "import base64; open('$TMP/a.png','wb').write(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='))"
+  echo "not an image" > "$TMP/a.txt"
+  head -c 6291456 /dev/zero > "$TMP/big.png"
+  code=$(curl -s -o "$TMP/body.json" -w "%{http_code}" -X POST -F "files=@$TMP/a.png" "$BASE/uploads"); [ "$code" = "401" ] && ok "$tag 未登入上傳→401 [$code]" || bad "$tag 未登入上傳" "$code"
+  code=$(curl -s -o "$TMP/body.json" -w "%{http_code}" -X POST -H "Authorization: Bearer $TOKEN_NEW" -F "files=@$TMP/a.txt" "$BASE/uploads"); [ "$code" = "400" ] && ok "$tag 假圖→400 [$code]" || bad "$tag 假圖" "$code"
+  code=$(curl -s -o "$TMP/body.json" -w "%{http_code}" -X POST -H "Authorization: Bearer $TOKEN_NEW" -F "files=@$TMP/big.png" "$BASE/uploads"); [ "$code" = "400" ] && ok "$tag 超大檔→400 [$code]" || bad "$tag 超大檔" "$code"
+  code=$(curl -s -o "$TMP/body.json" -w "%{http_code}" -X POST -H "Authorization: Bearer $TOKEN_NEW" -F "files=@$TMP/a.png" "$BASE/uploads"); [ "$code" = "200" ] && ok "$tag 上傳png [$code]" || bad "$tag 上傳" "$code"
+  IMGURL="$(jget "$TMP/body.json" "d[0]['url']")"
+  [ -n "$IMGURL" ] && ok "$tag 有url" || bad "$tag url空" "-"
+  code=$(curl -s -o "$TMP/img.bin" -w "%{http_code}" "http://localhost:$PORT$IMGURL"); [ "$code" = "200" ] && ok "$tag 圖可讀 [$code]" || bad "$tag 讀圖" "$code"
   expect "$tag 上架商品型" 200 POST /items "$TOKEN_NEW" \
     "{\"shop_id\":$SHOP,\"title\":\"測試水餃\",\"description\":\"現包冷凍\",\"price_cents\":16000,\"stock\":5,\"unit\":\"包\",\"category\":\"food\"}"
   PID="$(jget "$TMP/body.json" "d['id']")"
@@ -142,6 +153,15 @@ suite() { # suite <標籤>：完整 API 流程，假設是全新 DB（含種子�
   expect "$tag 上架混合型" 200 POST /items "$TOKEN_NEW" \
     "{\"shop_id\":$SHOP,\"title\":\"預訂水餃\",\"price_cents\":16000,\"stock\":3,\"unit\":\"包\",\"bookable\":true,\"category\":\"food\"}"
   MID="$(jget "$TMP/body.json" "d['id']")"
+  expect "$tag 上架帶圖" 200 POST /items "$TOKEN_NEW" \
+    "{\"shop_id\":$SHOP,\"title\":\"有圖水餃\",\"price_cents\":100,\"stock\":1,\"category\":\"daily\",\"images\":[\"$IMGURL\"]}"
+  IMGID="$(jget "$TMP/body.json" "d['id']")"
+  expect "$tag 詳情回圖" 200 GET "/items/$IMGID"
+  [ "$(jget "$TMP/body.json" "d['images'][0]")" = "$IMGURL" ] && ok "$tag 圖url對" || bad "$tag 圖" "-"
+  expect "$tag 上架爛圖→400" 400 POST /items "$TOKEN_NEW" \
+    "{\"shop_id\":$SHOP,\"title\":\"爛圖\",\"price_cents\":100,\"stock\":1,\"images\":\"x\"}"
+  expect "$tag 上架6張圖→400" 400 POST /items "$TOKEN_NEW" \
+    "{\"shop_id\":$SHOP,\"title\":\"爛圖\",\"price_cents\":100,\"stock\":1,\"images\":[\"$IMGURL\",\"$IMGURL\",\"$IMGURL\",\"$IMGURL\",\"$IMGURL\",\"$IMGURL\"]}"
   expect "$tag 他人商店上架→403" 403 POST /items "$TOKEN_B" \
     "{\"shop_id\":$SHOP,\"title\":\"偷渡\",\"price_cents\":100,\"stock\":1}"
   expect "$tag 無庫存又不可約→400" 400 POST /items "$TOKEN_NEW" \
@@ -200,6 +220,28 @@ suite() { # suite <標籤>：完整 API 流程，假設是全新 DB（含種子�
   [ "$(jget "$TMP/body.json" "d['status']")" = "cancelled" ] && ok "$tag cancelled" || bad "$tag cancel狀態" "-"
   expect "$tag 庫存回補" 200 GET "/items/$PID"
   [ "$(jget "$TMP/body.json" "d['stock']")" = "3" ] && ok "$tag 庫存回到3" || bad "$tag 庫存未回補" "-"
+
+  # --- 通知：下單→店主，確認→買家 ---
+  expect "$tag 未登入看通知→401" 401 GET /notifications
+  expect "$tag 賣家未讀數" 200 GET /notifications/unread-count "$TOKEN_NEW"
+  N0="$(jget "$TMP/body.json" "d['count']")"
+  expect "$tag 通知用下單" 200 POST /orders "$TOKEN_B" \
+    "{\"items\":[{\"item_id\":$PID,\"qty\":1}]}"
+  OID3="$(jget "$TMP/body.json" "d['id']")"
+  expect "$tag 店主未讀+1" 200 GET /notifications/unread-count "$TOKEN_NEW"
+  [ "$(jget "$TMP/body.json" "d['count']")" = "$((N0+1))" ] && ok "$tag 未讀加一" || bad "$tag 未讀數" "-"
+  expect "$tag 通知列表" 200 GET /notifications "$TOKEN_NEW"
+  [ "$(jget "$TMP/body.json" "[x['kind'] for x in d][0]")" = "order_created" ] && ok "$tag 最新是下單" || bad "$tag 通知kind" "-"
+  expect "$tag 買家未讀數" 200 GET /notifications/unread-count "$TOKEN_B"
+  M0="$(jget "$TMP/body.json" "d['count']")"
+  expect "$tag 賣家確認3" 200 PATCH "/orders/$OID3" "$TOKEN_NEW" '{"action":"confirm"}'
+  expect "$tag 買家未讀+1" 200 GET /notifications/unread-count "$TOKEN_B"
+  [ "$(jget "$TMP/body.json" "d['count']")" = "$((M0+1))" ] && ok "$tag 買家未讀加一" || bad "$tag 買家未讀" "-"
+  expect "$tag 買家明細有品名" 200 GET "/orders/$OID3" "$TOKEN_B"
+  [ "$(jget "$TMP/body.json" "d['items'][0]['title']")" != "" ] && ok "$tag 品名有" || bad "$tag 品名空" "-"
+  expect "$tag 全部已讀" 200 POST /notifications/read "$TOKEN_NEW" '{"ids":[]}'
+  expect "$tag 賣家未讀歸零" 200 GET /notifications/unread-count "$TOKEN_NEW"
+  [ "$(jget "$TMP/body.json" "d['count']")" = "0" ] && ok "$tag 歸零" || bad "$tag 未歸零" "-"
 
   # --- 訂單：不限量下大單不擋 ---
   expect "$tag 服務型下99件" 200 POST /orders "$TOKEN_B" \

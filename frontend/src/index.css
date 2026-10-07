@@ -57,3 +57,8 @@ button.mini { padding: 0.2rem 0.6rem; font-size: 0.9rem; margin-left: 0.4rem; }
   padding: 0.8rem 1.4rem; font-size: 1.1rem; z-index: 99;
   box-shadow: 0 4px 16px rgba(0,0,0,0.25);
 }
+/* v0.6：圖片縮圖＋通知鈴鐺 */
+.thumbs { display: flex; gap: 0.5rem; overflow-x: auto; margin-bottom: 0.6rem; }
+.thumbs img { width: 120px; height: 120px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); flex: none; }
+.bell { position: relative; text-decoration: none; }
+.bell .badge { position: absolute; top: -8px; right: -10px; background: #c62828; color: #fff; font-size: 0.7rem; border-radius: 999px; padding: 0 0.35rem; line-height: 1.3rem; }
