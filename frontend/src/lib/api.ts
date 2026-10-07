@@ -118,6 +118,4 @@ export const todayStr = (plus = 0) => {
   ).padStart(2, "0")}`;
 };
 
-export const WEEKDAY_ZH = ["日", "一", "二", "三", "四", "五", "六"];
-
 export const nt = (cents: number) => `NT$${(cents / 100).toLocaleString()}`;

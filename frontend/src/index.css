@@ -16,6 +16,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: system-
 .nav .logo { font-weight: 800; color: var(--brand); text-decoration: none; margin-right: auto; }
 .nav a { color: var(--ink); text-decoration: none; }
 .nav button { font-size: 1rem; }
+.nav select { width: auto; font-size: 0.95rem; padding: 0.4rem; }
 .main { max-width: 720px; margin: 0 auto; padding: 1rem; }
 button { background: var(--brand); color: var(--brand-ink); border: 0; border-radius: 10px; padding: 0.7rem 1.1rem; font-size: 1.05rem; cursor: pointer; }
 button:disabled { opacity: 0.5; }

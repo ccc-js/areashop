@@ -9,3 +9,5 @@
 | 買家（美濃） | 0900000003 | 美濃居民 | — |
 | 賣家（金門） | 0900000004 | 金門小農 | 金城放山雞、小農菜圃、水餃嫂、酒糟牛、寵物寄養、快剪、安心診所 |
 | 買家（金門） | 0900000005 | 金城居民 | — |
+| 賣家（夏威夷） | 0900000006 | Honolulu Farmer | Honolulu Poke Bowl、Waikiki Surf Lessons、Kailua Shave Ice |
+| 買家（夏威夷） | 0900000007 | Honolulu Local | — |

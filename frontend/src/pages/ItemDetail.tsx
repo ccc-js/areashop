@@ -4,18 +4,19 @@ import {
   api,
   nt,
   todayStr,
-  WEEKDAY_ZH,
   windowLabel,
   type ItemDetail as ID,
   type Shop,
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useLang } from "../lib/i18n";
 
 // /i/:id：統一項目詳情。賣東西（選數量）和賣服務（選日期）同一頁、同一種下單。
 export default function ItemDetail() {
   const { id } = useParams();
   const nav = useNavigate();
   const { user } = useAuth();
+  const { t, wdName } = useLang();
   const [sp, setSp] = useSearchParams();
   const [d, setD] = useState<ID | null>(null);
   const [shop, setShop] = useState<Shop | null>(null);
@@ -37,7 +38,7 @@ export default function ItemDetail() {
       .catch((e) => setMsg(String(e)));
   }, [id, month]);
 
-  if (!d) return <p>{msg || "載入中…"}</p>;
+  if (!d) return <p>{msg || t("common.loading")}</p>;
   const sel = d.days.find((x) => x.date === date);
   const canBuy = d.stock == null || d.stock > 0;
   const dateOk = !d.bookable || (sel && sel.open && !sel.full && date >= todayStr());
@@ -53,7 +54,7 @@ export default function ItemDetail() {
       return;
     }
     if (d.bookable && !date) {
-      setMsg("請選日期");
+      setMsg(t("item.needDate"));
       return;
     }
     try {
@@ -74,26 +75,26 @@ export default function ItemDetail() {
 
   return (
     <div className="detail">
-      <button className="back" onClick={() => nav(-1)}>← 返回</button>
+      <button className="back" onClick={() => nav(-1)}>{t("item.back")}</button>
       <h2>{d.title}</h2>
       <p className="price">{nt(d.price_cents)} / {d.unit}</p>
       {d.description && <p>{d.description}</p>}
       {d.notice && <p className="hint">※ {d.notice}</p>}
-      {d.stock != null && <p>庫存：{d.stock}</p>}
-      {d.bookable && <p className="hint">{d.cancel_hours} 小時前可免費取消</p>}
+      {d.stock != null && <p>{t("item.stock")}{d.stock}</p>}
+      {d.bookable && <p className="hint">{t("item.freeCancel", { n: d.cancel_hours })}</p>}
       {shop && (
         <div className="order">
-          <div>賣家：{shop.name}</div>
-          {shop.address && <div>店址：{shop.address}</div>}
-          {shop.opening_hours && <div>營業：{shop.opening_hours}</div>}
-          {!shop.address && <div className="hint">無店面，下單時與賣家約面交地點</div>}
+          <div>{t("item.seller")}{shop.name}</div>
+          {shop.address && <div>{t("item.address")}{shop.address}</div>}
+          {shop.opening_hours && <div>{t("item.hours")}{shop.opening_hours}</div>}
+          {!shop.address && <div className="hint">{t("item.noStorefront")}</div>}
         </div>
       )}
 
       {d.bookable && (
         <>
           <h3>
-            選日期（{month}）
+            {t("item.pickDate", { m: month })}
             <button className="mini" onClick={() => shift(-1)}>‹</button>
             <button className="mini" onClick={() => shift(1)}>›</button>
           </h3>
@@ -112,17 +113,17 @@ export default function ItemDetail() {
                   }}
                 >
                   <div>{Number(x.date.slice(8, 10))}</div>
-                  <div className="wd">週{WEEKDAY_ZH[wd]}</div>
-                  <div className="wd">{!x.open ? "休" : x.full ? "滿" : "可約"}</div>
+                  <div className="wd">{t("item.wd", { wd: wdName(wd) })}</div>
+                  <div className="wd">{!x.open ? t("item.closed") : x.full ? t("item.full") : t("item.available")}</div>
                 </button>
               );
             })}
           </div>
           {sel && sel.open && !sel.full && sel.windows.length > 0 && (
             <label>
-              時段
+              {t("item.slot")}
               <select value={window} onChange={(e) => setWindow(e.target.value)}>
-                <option value="">不指定</option>
+                <option value="">{t("item.anytime")}</option>
                 {sel.windows.map((w) => {
                   const label = windowLabel(w);
                   return <option key={label} value={label}>{label}</option>;
@@ -134,12 +135,12 @@ export default function ItemDetail() {
       )}
 
       <div className="buy-box">
-        <label>數量 <input type="number" min={1} max={d.stock ?? undefined} value={qty} onChange={(e) => setQty(Number(e.target.value))} /></label>
+        <label>{t("item.qty")} <input type="number" min={1} max={d.stock ?? undefined} value={qty} onChange={(e) => setQty(Number(e.target.value))} /></label>
         {d.bookable && (
-          <label>說明 <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="例如：柴犬 8kg，疫苗齊全" /></label>
+          <label>{t("item.note")} <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("item.notePh")} /></label>
         )}
         <button onClick={order} disabled={!canBuy || !dateOk}>
-          {d.bookable ? "預約" : "下單"}（面交付款）
+          {d.bookable ? t("item.book") : t("item.order")}{t("item.payMeetup")}
         </button>
       </div>
       {msg && <p className="error">{msg}</p>}

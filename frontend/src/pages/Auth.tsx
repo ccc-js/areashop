@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useArea } from "../lib/area";
+import { useLang } from "../lib/i18n";
 
 export function Login() {
   const nav = useNavigate();
   const { login } = useAuth();
+  const { t } = useLang();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
@@ -19,13 +21,13 @@ export function Login() {
   };
   return (
     <div className="form">
-      <h2>登入</h2>
-      <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="手機號碼" />
-      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="密碼" />
+      <h2>{t("auth.login")}</h2>
+      <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("auth.phone")} />
+      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.password")} />
       {err && <p className="error">{err}</p>}
-      <button onClick={go}>登入</button>
-      <p>還沒有帳號？<Link to="/register">註冊</Link></p>
-      <p className="hint">開發種子帳號：0900000003 / password123</p>
+      <button onClick={go}>{t("auth.login")}</button>
+      <p>{t("auth.noAccount")}<Link to="/register">{t("auth.register")}</Link></p>
+      <p className="hint">{t("auth.demo")}</p>
     </div>
   );
 }
@@ -34,6 +36,7 @@ export function Register() {
   const nav = useNavigate();
   const { register } = useAuth();
   const { areas } = useArea();
+  const { t } = useLang();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
@@ -50,12 +53,12 @@ export function Register() {
   };
   return (
     <div className="form">
-      <h2>註冊</h2>
-      <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="手機號碼" />
-      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="密碼（至少6碼）" />
-      <input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="暱稱" />
+      <h2>{t("auth.register")}</h2>
+      <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("auth.phone")} />
+      <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.passwordHint")} />
+      <input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder={t("auth.nickname")} />
       <select value={areaId ?? ""} onChange={(e) => setAreaId(Number(e.target.value))}>
-        <option value="">選擇我的地區</option>
+        <option value="">{t("auth.chooseArea")}</option>
         {counties.map((c) => (
           <optgroup key={c} label={c}>
             {areas.filter((a) => a.county === c).map((a) => (
@@ -65,7 +68,7 @@ export function Register() {
         ))}
       </select>
       {err && <p className="error">{err}</p>}
-      <button onClick={go}>註冊</button>
+      <button onClick={go}>{t("auth.register")}</button>
     </div>
   );
 }

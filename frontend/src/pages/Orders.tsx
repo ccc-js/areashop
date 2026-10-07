@@ -1,31 +1,31 @@
 import { useEffect, useState } from "react";
 import { api, nt, type Order, type OrderDetail } from "../lib/api";
 import { useAuth } from "../lib/auth";
-
-// 狀態機：pending → confirmed → ready → completed；confirmed 可跳過 ready 直接完成；
-// confirmed/ready 可記 noshow（店主）。後端擋權限，前端照狀態給按鈕。
-const NEXT: Record<string, { action: string; label: string }[]> = {
-  pending: [{ action: "confirm", label: "確認接單" }],
-  confirmed: [
-    { action: "ready", label: "可面交" },
-    { action: "complete", label: "完成" },
-    { action: "noshow", label: "記爽約" },
-  ],
-  ready: [
-    { action: "complete", label: "完成" },
-    { action: "noshow", label: "記爽約" },
-  ],
-};
-
-const CANCELABLE = ["pending", "confirmed", "ready"];
+import { useLang } from "../lib/i18n";
 
 export default function Orders() {
   const { user } = useAuth();
+  const { t, statusLabel } = useLang();
   const [role, setRole] = useState<"buyer" | "seller">("buyer");
   const [orders, setOrders] = useState<Order[]>([]);
   // 賣家視角才抓明細（含買家＋品項）
   const [details, setDetails] = useState<Record<number, OrderDetail>>({});
   const [err, setErr] = useState("");
+
+  const NEXT: Record<string, { action: string; key: "orders.confirm" | "orders.ready" | "orders.complete" | "orders.noshow" }[]> = {
+    pending: [{ action: "confirm", key: "orders.confirm" }],
+    confirmed: [
+      { action: "ready", key: "orders.ready" },
+      { action: "complete", key: "orders.complete" },
+      { action: "noshow", key: "orders.noshow" },
+    ],
+    ready: [
+      { action: "complete", key: "orders.complete" },
+      { action: "noshow", key: "orders.noshow" },
+    ],
+  };
+
+  const CANCELABLE = ["pending", "confirmed", "ready"];
 
   const load = () =>
     api<Order[]>(`/orders?role=${role}`)
@@ -60,26 +60,26 @@ export default function Orders() {
     }
   };
 
-  if (!user) return <p>請先登入。</p>;
+  if (!user) return <p>{t("common.loginFirst")}</p>;
   return (
     <div>
-      <h2>我的訂單</h2>
+      <h2>{t("orders.title")}</h2>
       <div className="tabs">
-        <button className={role === "buyer" ? "on" : ""} onClick={() => setRole("buyer")}>我是買家</button>
-        <button className={role === "seller" ? "on" : ""} onClick={() => setRole("seller")}>我是賣家</button>
+        <button className={role === "buyer" ? "on" : ""} onClick={() => setRole("buyer")}>{t("orders.buyer")}</button>
+        <button className={role === "seller" ? "on" : ""} onClick={() => setRole("seller")}>{t("orders.seller")}</button>
       </div>
       {err && <p className="error">{err}</p>}
       {orders.map((o) => (
         <div key={o.id} className="order">
           <div>
-            #{o.id} · {o.status} · {nt(o.total_cents)}
+            #{o.id} · {statusLabel(o.status)} · {nt(o.total_cents)}
             {o.date && ` · ${o.date}${o.window ? ` ${o.window}` : ""}`}
           </div>
-          {o.remark && <div className="hint">備註：{o.remark}</div>}
+          {o.remark && <div className="hint">{t("orders.remark")}{o.remark}</div>}
           {role === "seller" && details[o.id] && (
             <>
               <div className="hint">
-                買家：{details[o.id].buyer.nickname}（{details[o.id].buyer.phone}）
+                {t("orders.buyerIs")}{details[o.id].buyer.nickname}（{details[o.id].buyer.phone}）
               </div>
               {details[o.id].items.map((it) => (
                 <div key={it.id}>
@@ -90,15 +90,15 @@ export default function Orders() {
           )}
           <div className="row">
             {(NEXT[o.status] ?? []).map((n) => (
-              <button key={n.action} onClick={() => act(o.id, n.action)}>{n.label}</button>
+              <button key={n.action} onClick={() => act(o.id, n.action)}>{t(n.key)}</button>
             ))}
             {CANCELABLE.includes(o.status) && (
-              <button onClick={() => act(o.id, "cancel")}>取消</button>
+              <button onClick={() => act(o.id, "cancel")}>{t("orders.cancel")}</button>
             )}
           </div>
         </div>
       ))}
-      {orders.length === 0 && <p className="empty">還沒有訂單。</p>}
+      {orders.length === 0 && <p className="empty">{t("orders.empty")}</p>}
     </div>
   );
 }

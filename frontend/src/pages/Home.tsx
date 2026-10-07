@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { api, nt, type Item } from "../lib/api";
 import { useArea } from "../lib/area";
+import { useLang } from "../lib/i18n";
 
 // 首頁狀態全部收進 URL（?county=&town=&q=）：上一頁返回、重新整理、分享連結
 // 都會回到同一個篩選狀態；捲動位置用 sessionStorage 按 URL 記憶。
 // 賣東西和賣服務同一種：一個列表，徽章區分（可預約 / 剩件數 / 不限量）。
 export default function Home() {
   const { areas, current, setCurrentId } = useArea();
+  const { t } = useLang();
   const [sp, setSp] = useSearchParams();
   const location = useLocation();
   const [items, setItems] = useState<Item[]>([]);
@@ -89,7 +91,7 @@ export default function Home() {
     <div>
       <div className="area-bar">
         <label>
-          縣市
+          {t("home.county")}
           <select value={county} onChange={(e) => setCounty(e.target.value)}>
             {counties.map((c) => (
               <option key={c} value={c}>{c}</option>
@@ -97,9 +99,9 @@ export default function Home() {
           </select>
         </label>
         <label>
-          鄉鎮
+          {t("home.town")}
           <select value={town} onChange={(e) => setTown(e.target.value)}>
-            <option value="all">不分區（全{county}）</option>
+            <option value="all">{t("home.all", { county })}</option>
             {townships.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.township}
@@ -107,7 +109,7 @@ export default function Home() {
             ))}
           </select>
         </label>
-        <span className="hint">只看附近，不看全站</span>
+        <span className="hint">{t("home.nearby")}</span>
       </div>
 
       <div className="search-bar">
@@ -115,13 +117,13 @@ export default function Home() {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && search()}
-          placeholder="搜尋：水餃、放山雞、寄養…"
+          placeholder={t("home.searchPh")}
         />
-        <button onClick={search}>搜尋</button>
+        <button onClick={search}>{t("home.search")}</button>
       </div>
 
       {err && <p className="error">{err}</p>}
-      {items.length === 0 && !err && <p className="empty">這個地區還沒有東西，去隔壁鄉鎮看看吧。</p>}
+      {items.length === 0 && !err && <p className="empty">{t("home.empty")}</p>}
 
       <div className="grid">
         {items.map((p) => (
@@ -129,10 +131,10 @@ export default function Home() {
             <div className="card-title">{p.title}</div>
             <div className="card-meta">
               {nt(p.price_cents)}/{p.unit}
-              {p.bookable && " · 可預約"}
+              {p.bookable && ` · ${t("home.bookable")}`}
             </div>
             <div className="card-stock">
-              {p.stock != null && (p.stock > 0 ? `剩 ${p.stock}` : "售完")}
+              {p.stock != null && (p.stock > 0 ? t("home.left", { n: p.stock }) : t("home.soldout"))}
             </div>
           </Link>
         ))}

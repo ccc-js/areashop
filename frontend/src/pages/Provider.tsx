@@ -4,7 +4,6 @@ import {
   api,
   nt,
   todayStr,
-  WEEKDAY_ZH,
   windowLabel,
   type Item,
   type ItemDetail as SD,
@@ -12,6 +11,7 @@ import {
   type TimeWindow,
 } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useLang } from "../lib/i18n";
 import { toast } from "../lib/toast";
 
 interface Shop {
@@ -28,6 +28,7 @@ interface DayRow {
 // /provider：接案管理（週範本＋單日開關＋當日預約）
 export default function Provider() {
   const { user } = useAuth();
+  const { t, wdName, statusLabel } = useLang();
   const [shops, setShops] = useState<Shop[]>([]);
   const [shopId, setShopId] = useState(0);
   const [items, setItems] = useState<Item[]>([]);
@@ -86,7 +87,7 @@ export default function Provider() {
     if (itemId) loadDetail(itemId, month);
   }, [itemId, month]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!user) return <p>請先登入。</p>;
+  if (!user) return <p>{t("common.loginFirst")}</p>;
 
   const addItem = async () => {
     try {
@@ -101,7 +102,7 @@ export default function Provider() {
         }),
       });
       setTitle("");
-      setMsg("新增項目成功，接著設每週可接案時間。");
+      setMsg(t("provider.added"));
       const list = await api<{ items: Item[] }>(`/items?shop_id=${shopId}`);
       setItems(list.items);
       setItemId(s.id);
@@ -118,8 +119,8 @@ export default function Provider() {
           weekly: week.map((w, weekday) => ({ weekday, open: w.open, windows: w.wins })),
         }),
       });
-      setMsg("週範本已儲存。");
-      toast("已儲存");
+      setMsg(t("provider.tplSaved"));
+      toast(t("common.saved"));
       loadDetail(itemId, month);
     } catch (e) {
       setMsg(String(e));
@@ -130,7 +131,7 @@ export default function Provider() {
     const s = draft[wd].s.trim();
     const e = draft[wd].e.trim();
     if (!s || !e) {
-      setMsg("起點終點都要填（自由填，如 09:00 或 早上九點）。");
+      setMsg(t("provider.needEnds"));
       return;
     }
     const n = [...week];
@@ -170,8 +171,8 @@ export default function Provider() {
           note: excNote || undefined,
         }),
       });
-      setMsg("單日設定已儲存（範本不受影響）。");
-      toast("已儲存");
+      setMsg(t("provider.daySaved"));
+      toast(t("common.saved"));
       setExcNote("");
       loadDetail(itemId, month);
     } catch (e) {
@@ -199,20 +200,20 @@ export default function Provider() {
 
   return (
     <div>
-      <h2>接案管理</h2>
+      <h2>{t("provider.title")}</h2>
       <div className="form">
-        <label>店家
+        <label>{t("provider.shop")}
           <select value={shopId} onChange={(e) => setShopId(Number(e.target.value))}>
-            <option value={0}>選店家</option>
+            <option value={0}>{t("provider.pickShop")}</option>
             {shops.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
         </label>
         {shopId > 0 && (
-          <label>項目
+          <label>{t("provider.item")}
             <select value={itemId} onChange={(e) => setItemId(Number(e.target.value))}>
-              <option value={0}>選項目</option>
+              <option value={0}>{t("provider.pickItem")}</option>
               {items.map((s) => (
                 <option key={s.id} value={s.id}>{s.title}（{nt(s.price_cents)}）</option>
               ))}
@@ -223,16 +224,16 @@ export default function Provider() {
 
       {shopId > 0 && (
         <div className="form">
-          <h3>新增可預約項目</h3>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：貓狗寄養 1 天" />
-          <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="價格（元）" />
-          <button onClick={addItem}>新增</button>
+          <h3>{t("provider.addTitle")}</h3>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("provider.namePh")} />
+          <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder={t("provider.pricePh")} />
+          <button onClick={addItem}>{t("provider.add")}</button>
         </div>
       )}
 
       {detail && (
         <>
-          <h3>每週可接案時間（範本）</h3>
+          <h3>{t("provider.weekTitle")}</h3>
           <div className="form">
             {week.map((w, wd) => (
               <div key={wd}>
@@ -246,12 +247,12 @@ export default function Provider() {
                       setWeek(n);
                     }}
                   />
-                  週{WEEKDAY_ZH[wd]}可接
+                  {t("provider.wdOpen", { wd: wdName(wd) })}
                 </label>
-                {w.wins.map((t, i) => (
+                {w.wins.map((t_, i) => (
                   <div key={i} className="area-bar">
-                    <span>{windowLabel(t)}</span>
-                    <button className="mini" onClick={() => delWin(wd, i)}>刪除</button>
+                    <span>{windowLabel(t_)}</span>
+                    <button className="mini" onClick={() => delWin(wd, i)}>{t("provider.del")}</button>
                   </div>
                 ))}
                 <div className="area-bar">
@@ -262,7 +263,7 @@ export default function Provider() {
                       n[wd] = { ...n[wd], s: e.target.value };
                       setDraft(n);
                     }}
-                    placeholder="起點，如 09:00"
+                    placeholder={t("provider.startPh")}
                   />
                   <span>～</span>
                   <input
@@ -272,16 +273,16 @@ export default function Provider() {
                       n[wd] = { ...n[wd], e: e.target.value };
                       setDraft(n);
                     }}
-                    placeholder="終點，如 12:00"
+                    placeholder={t("provider.endPh")}
                   />
-                  <button className="mini" onClick={() => addWin(wd)}>＋時段</button>
+                  <button className="mini" onClick={() => addWin(wd)}>{t("provider.addSlot")}</button>
                 </div>
               </div>
             ))}
-            <button onClick={saveWeek}>儲存範本</button>
+            <button onClick={saveWeek}>{t("provider.saveTpl")}</button>
           </div>
 
-          <h3>單日開關（{month}，點兩下快速開/關）
+          <h3>{t("provider.dayTitle", { m: month })}
             <button className="mini" onClick={() => shiftMonth(-1)}>‹</button>
             <button className="mini" onClick={() => shiftMonth(1)}>›</button>
           </h3>
@@ -295,52 +296,52 @@ export default function Provider() {
                   setExcMode(!x.open ? "closed" : x.full ? "full" : "open");
                 }}
                 onDoubleClick={() => toggleDay(x.date, x.open)}
-                title="點兩下快速開/關"
+                title={t("provider.dblClick")}
               >
                 <div>{Number(x.date.slice(8, 10))}</div>
-                <div className="wd">{!x.open ? "休" : x.full ? "滿" : "可約"}</div>
+                <div className="wd">{!x.open ? t("provider.closed") : x.full ? t("provider.full") : t("provider.available")}</div>
               </button>
             ))}
           </div>
 
           {selDay && (
             <div className="order">
-              <h3>{day}（{!selDay.open ? "不營業" : selDay.full ? "額滿" : "可接"}）</h3>
+              <h3>{day}（{!selDay.open ? t("provider.dayClosed") : selDay.full ? t("provider.dayFull") : t("provider.dayOpen")}）</h3>
               {selOrders.map((a) => (
                 <div key={a.id}>
-                  #{a.id} · {a.window ?? "不指定"} · {a.status} · {a.remark ?? ""}
+                  #{a.id} · {a.window ?? t("provider.notSpecified")} · {statusLabel(a.status)} · {a.remark ?? ""}
                   <span className="row">
-                    {a.status === "pending" && <button onClick={() => act(a.id, "confirm")}>確認</button>}
+                    {a.status === "pending" && <button onClick={() => act(a.id, "confirm")}>{t("provider.confirm")}</button>}
                     {a.status === "confirmed" && (
                       <>
-                        <button onClick={() => act(a.id, "ready")}>可面交</button>
-                        <button onClick={() => act(a.id, "complete")}>完成</button>
-                        <button onClick={() => act(a.id, "noshow")}>爽約</button>
+                        <button onClick={() => act(a.id, "ready")}>{t("orders.ready")}</button>
+                        <button onClick={() => act(a.id, "complete")}>{t("provider.complete")}</button>
+                        <button onClick={() => act(a.id, "noshow")}>{t("provider.noshow")}</button>
                       </>
                     )}
                     {a.status === "ready" && (
                       <>
-                        <button onClick={() => act(a.id, "complete")}>完成</button>
-                        <button onClick={() => act(a.id, "noshow")}>爽約</button>
+                        <button onClick={() => act(a.id, "complete")}>{t("provider.complete")}</button>
+                        <button onClick={() => act(a.id, "noshow")}>{t("provider.noshow")}</button>
                       </>
                     )}
                     {["pending", "confirmed", "ready"].includes(a.status) && (
-                      <button onClick={() => act(a.id, "cancel")}>取消</button>
+                      <button onClick={() => act(a.id, "cancel")}>{t("provider.cancel")}</button>
                     )}
                   </span>
                 </div>
               ))}
-              {selOrders.length === 0 && <p className="hint">這天還沒有訂單。</p>}
+              {selOrders.length === 0 && <p className="hint">{t("provider.noOrders")}</p>}
               <div className="buy-box">
-                <h4>改這天（只影響這天，範本不動）</h4>
+                <h4>{t("provider.editDay")}</h4>
                 <div className="tabs">
-                  <button className={excMode === "open" ? "on" : ""} onClick={() => setExcMode("open")}>正常接</button>
-                  <button className={excMode === "full" ? "on" : ""} onClick={() => setExcMode("full")}>當日額滿</button>
-                  <button className={excMode === "closed" ? "on" : ""} onClick={() => setExcMode("closed")}>當日不營業</button>
+                  <button className={excMode === "open" ? "on" : ""} onClick={() => setExcMode("open")}>{t("provider.normal")}</button>
+                  <button className={excMode === "full" ? "on" : ""} onClick={() => setExcMode("full")}>{t("provider.fullDay")}</button>
+                  <button className={excMode === "closed" ? "on" : ""} onClick={() => setExcMode("closed")}>{t("provider.closedDay")}</button>
                 </div>
-                <input value={excNote} onChange={(e) => setExcNote(e.target.value)} placeholder="備註，例如：下午器材維修" />
-                <button onClick={saveExc}>儲存單日設定</button>
-                <Link to={`/i/${detail.id}?month=${month}`}>看居民視角</Link>
+                <input value={excNote} onChange={(e) => setExcNote(e.target.value)} placeholder={t("provider.notePh")} />
+                <button onClick={saveExc}>{t("provider.saveDay")}</button>
+                <Link to={`/i/${detail.id}?month=${month}`}>{t("provider.preview")}</Link>
               </div>
             </div>
           )}

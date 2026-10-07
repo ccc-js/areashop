@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { api, type Item } from "../lib/api";
+import { api, nt, type Item } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useLang } from "../lib/i18n";
 import { toast } from "../lib/toast";
 import { useArea } from "../lib/area";
 
@@ -15,6 +16,7 @@ interface Shop {
 export default function Seller() {
   const { user } = useAuth();
   const { current } = useArea();
+  const { t } = useLang();
   const [shops, setShops] = useState<Shop[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [shopName, setShopName] = useState("");
@@ -44,7 +46,7 @@ export default function Seller() {
     }
   }, [shops]);
 
-  if (!user) return <p>請先登入再開店。</p>;
+  if (!user) return <p>{t("common.loginFirstShop")}</p>;
 
   const openShop = async () => {
     try {
@@ -59,7 +61,7 @@ export default function Seller() {
         }),
       });
       setShopName("");
-      setMsg("開店成功！");
+      setMsg(t("seller.opened"));
       load();
     } catch (e) {
       setMsg(String(e));
@@ -73,8 +75,8 @@ export default function Seller() {
         method: "PATCH",
         body: JSON.stringify({ opening_hours: editHours }),
       });
-      setMsg("營業時間已更新，買家在項目頁看得到。");
-      toast("已儲存");
+      setMsg(t("seller.hoursUpdated"));
+      toast(t("common.saved"));
       load();
     } catch (e) {
       setMsg(String(e));
@@ -83,19 +85,19 @@ export default function Seller() {
 
   const addItem = async () => {
     if (!shops[0]) {
-      setMsg("請先開店");
+      setMsg(t("seller.openFirst"));
       return;
     }
     if (!title.trim() || !(Number(price) > 0)) {
-      setMsg("請填名稱、價格（元，須大於 0）");
+      setMsg(t("seller.needNamePrice"));
       return;
     }
     if (stock.trim() !== "" && !(Number(stock) >= 0)) {
-      setMsg("庫存請填 0 以上的數字，空白 = 不限量");
+      setMsg(t("seller.badStock"));
       return;
     }
     if (stock.trim() === "" && !bookable) {
-      setMsg("不限量又不接預約就沒東西可賣了，請二選一");
+      setMsg(t("seller.needEither"));
       return;
     }
     try {
@@ -111,7 +113,7 @@ export default function Seller() {
         }),
       });
       setTitle("");
-      setMsg(bookable ? "上架成功！去「接案管理」設可接案時間。" : "上架成功！");
+      setMsg(bookable ? t("seller.listedGo") : t("seller.listed"));
       const d = await api<{ items: Item[] }>(`/items?shop_id=${shops[0].id}`);
       setItems(d.items);
     } catch (e) {
@@ -131,46 +133,46 @@ export default function Seller() {
 
   return (
     <div>
-      <h2>賣家中心</h2>
+      <h2>{t("seller.title")}</h2>
       {shops.length === 0 ? (
         <div className="form">
-          <h3>10 分鐘開店</h3>
-          <input value={shopName} onChange={(e) => setShopName(e.target.value)} placeholder="店名，例如：美濃放山雞" />
+          <h3>{t("seller.open10")}</h3>
+          <input value={shopName} onChange={(e) => setShopName(e.target.value)} placeholder={t("seller.shopNamePh")} />
           <select value={kind} onChange={(e) => setKind(e.target.value)}>
-            <option value="personal">個人賣家（約面交）</option>
-            <option value="store">有店面</option>
+            <option value="personal">{t("seller.personal")}</option>
+            <option value="store">{t("seller.store")}</option>
           </select>
           {kind === "store" && (
-            <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="店址，例如：金城鎮模範街12號" />
+            <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("seller.addressPh")} />
           )}
-          <input value={hours} onChange={(e) => setHours(e.target.value)} placeholder={kind === "store" ? "營業時間，例如：每日 10:00-19:00" : "面交時間，例如：週六 09:00-11:00"} />
-          <button onClick={openShop}>開店（{current?.county}{current?.township}）</button>
+          <input value={hours} onChange={(e) => setHours(e.target.value)} placeholder={kind === "store" ? t("seller.hoursPhStore") : t("seller.hoursPhMeet")} />
+          <button onClick={openShop}>{t("seller.openBtn", { area: `${current?.county ?? ""}${current?.township ?? ""}` })}</button>
         </div>
       ) : (
         <>
-          <p>我的店：{shops[0].name}</p>
+          <p>{t("seller.myShop")}{shops[0].name}</p>
           <div className="form">
-            <h3>店鋪設定</h3>
-            <input value={editHours} onChange={(e) => setEditHours(e.target.value)} placeholder={shops[0].kind === "store" ? "營業時間，例如：每日 10:00-19:00" : "面交時間，例如：週六 09:00-11:00"} />
-            <button onClick={saveHours}>更新營業時間</button>
+            <h3>{t("seller.settings")}</h3>
+            <input value={editHours} onChange={(e) => setEditHours(e.target.value)} placeholder={shops[0].kind === "store" ? t("seller.hoursPhStore") : t("seller.hoursPhMeet")} />
+            <button onClick={saveHours}>{t("seller.updateHours")}</button>
           </div>
           <div className="form">
-            <h3>上架（賣東西和賣服務同一種）</h3>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="名稱，例如：土雞蛋 10 顆 / 男士快剪" />
-            <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="價格（元）" />
-            <input value={stock} onChange={(e) => setStock(e.target.value)} placeholder="庫存（空白 = 不限量）" />
+            <h3>{t("seller.listTitle")}</h3>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("seller.namePh")} />
+            <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder={t("seller.pricePh")} />
+            <input value={stock} onChange={(e) => setStock(e.target.value)} placeholder={t("seller.stockPh")} />
             <label>
               <input type="checkbox" checked={bookable} onChange={(e) => setBookable(e.target.checked)} />
-              接受選日期預約（設好後去「接案管理」排時間）
+              {t("seller.bookable")}
             </label>
-            <button onClick={addItem}>上架</button>
+            <button onClick={addItem}>{t("seller.listBtn")}</button>
           </div>
-          <h3>我的項目（{items.length}）</h3>
+          <h3>{t("seller.myItems", { n: items.length })}</h3>
           {items.map((p) => (
             <div key={p.id} className="order">
-              {p.title} · NT${p.price_cents / 100}{p.stock != null && ` · 剩 ${p.stock}`} · {p.bookable ? "可預約" : "直接買"}
+              {p.title} · {nt(p.price_cents)}{p.stock != null && ` · ${t("home.left", { n: p.stock })}`} · {p.bookable ? t("seller.bookableTag") : t("seller.directTag")}
               <span className="row">
-                <button onClick={() => takeOff(p.id)}>下架</button>
+                <button onClick={() => takeOff(p.id)}>{t("seller.takeOff")}</button>
               </span>
             </div>
           ))}

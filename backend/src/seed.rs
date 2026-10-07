@@ -1,5 +1,5 @@
-//! 開發用種子資料：兩個示範鄉鎮（高雄美濃 ＋ 金門金城）+ 店家 + 統一項目 + 訂單。
-//! 冪等：基底（areas）只在空庫塞；訂單類表空就補，舊庫重開即有。
+//! 開發用種子資料：兩個示範鄉鎮（高雄美濃 ＋ 金門金城）+ 夏威夷英文區 + 店家 + 統一項目 + 訂單。
+//! 冪等：基底（areas）只在空庫塞；訂單類、夏威夷區表空/缺就補，舊庫重開即有。
 
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
@@ -141,11 +141,21 @@ async fn mk_shop_with_items(
 }
 
 pub async fn seed_if_empty(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
-    use sea_orm::PaginatorTrait;
+    use sea_orm::{ColumnTrait, PaginatorTrait, QueryFilter};
     let n = area::Entity::find().paginate(db, 1).num_items().await?;
     // 基底：只有空庫才塞（舊庫沿用，避免洗掉店家資料）
     if n == 0 {
         seed_base(db).await?;
+    }
+
+    // 夏威夷英文示範區：加法冪等——沒有就補（舊庫重開即有）
+    let hi = area::Entity::find()
+        .filter(area::Column::County.eq("Hawaii"))
+        .paginate(db, 1)
+        .num_items()
+        .await?;
+    if hi == 0 {
+        seed_hawaii(db).await?;
     }
 
     // 訂單類：加法冪等——表空的就補（舊庫重開即有；店家訂單數 0..5 分布）
@@ -518,6 +528,194 @@ async fn seed_base(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
         mk_shop_with_items(db, km_seller.id, kinmen.id, &s).await?;
     }
 
+    Ok(())
+}
+
+/// 夏威夷英文示範區（給英文版 UI 用的測試資料）
+async fn seed_hawaii(db: &sea_orm::DbConn) -> Result<(), sea_orm::DbErr> {
+    use chrono::Datelike;
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+    let honolulu = mk_area(db, "Hawaii", "Honolulu", 21.3099, -157.8581).await?;
+    mk_area(db, "Hawaii", "Kailua", 21.4022, -157.7394).await?;
+
+    // ---- 帳號（密碼皆 password123，僅開發用） ----
+    let seller = mk_user(db, "0900000006", "Honolulu Farmer", honolulu.id, "user").await?;
+    let buyer = mk_user(db, "0900000007", "Honolulu Local", honolulu.id, "user").await?;
+
+    // ---- 店家 ----
+    for s in [
+        SeedShop {
+            name: "Honolulu Poke Bowl",
+            kind: "store",
+            address: Some("123 Kalakaua Ave, Honolulu, HI"),
+            opening_hours: Some("Tue-Sun 10:00-20:00"),
+            desc: "Fresh ahi poke, made to order",
+            addr: "Pickup at Kalakaua Ave store",
+            items: vec![
+                SeedItem {
+                    title: "Ahi Poke Bowl",
+                    desc: Some("Fresh tuna, rice, seaweed salad"),
+                    price_cents: 1250,
+                    unit: "bowl",
+                    stock: Some(20),
+                    bookable: false,
+                    cancel_hours: 24,
+                    notice: None,
+                },
+                SeedItem {
+                    title: "Spam Musubi (3 pcs)",
+                    desc: None,
+                    price_cents: 450,
+                    unit: "pack",
+                    stock: Some(30),
+                    bookable: false,
+                    cancel_hours: 24,
+                    notice: None,
+                },
+            ],
+        },
+        SeedShop {
+            name: "Waikiki Surf Lessons",
+            kind: "personal",
+            address: None,
+            opening_hours: Some("Lessons daily 08:00-17:00 (book first)"),
+            desc: "Beginner surf lessons with local instructors",
+            addr: "Meet at Waikiki Beach, in front of Duke statue",
+            items: vec![SeedItem {
+                title: "Beginner Surf Lesson",
+                desc: Some("1-hour lesson, board included"),
+                price_cents: 8000,
+                unit: "session",
+                stock: None,
+                bookable: true,
+                cancel_hours: 48,
+                notice: Some("Please bring swimwear and sunscreen"),
+            }],
+        },
+        SeedShop {
+            name: "Kailua Shave Ice",
+            kind: "store",
+            address: Some("45 Kailua Rd, Kailua, HI"),
+            opening_hours: Some("Daily 11:00-18:00"),
+            desc: "Rainbow shave ice with island syrups",
+            addr: "Pickup at Kailua Rd store",
+            items: vec![SeedItem {
+                title: "Rainbow Shave Ice",
+                desc: None,
+                price_cents: 650,
+                unit: "cup",
+                stock: Some(25),
+                bookable: false,
+                cancel_hours: 24,
+                notice: None,
+            }],
+        },
+    ] {
+        mk_shop_with_items(db, seller.id, honolulu.id, &s).await?;
+    }
+
+    // ---- 訂單：2 筆直接買＋1 筆預約 ----
+    mk_hawaii_order(db, buyer.id, "Honolulu Poke Bowl", 0, 2, "pending").await?;
+    mk_hawaii_order(db, buyer.id, "Kailua Shave Ice", 0, 1, "completed").await?;
+
+    // 預約一筆（推到週二～週六，配合範本）
+    let sh = shop::Entity::find()
+        .filter(shop::Column::Name.eq("Waikiki Surf Lessons"))
+        .one(db)
+        .await?
+        .unwrap();
+    let svc = item::Entity::find()
+        .filter(item::Column::ShopId.eq(sh.id))
+        .one(db)
+        .await?
+        .unwrap();
+    let mut d = Utc::now().date_naive() + chrono::Duration::days(3);
+    while matches!(d.weekday().num_days_from_sunday(), 0 | 1) {
+        d = d.succ_opt().unwrap();
+    }
+    let om = order::ActiveModel {
+        buyer_id: Set(buyer.id),
+        shop_id: Set(sh.id),
+        status: Set("confirmed".to_string()),
+        pickup_at: Set(None),
+        date: Set(Some(d.format("%Y-%m-%d").to_string())),
+        window: Set(Some("09:00-12:00".to_string())),
+        total_cents: Set(svc.price_cents),
+        remark: Set(Some("First timer, need small board".to_string())),
+        created_at: Set(Utc::now()),
+        ..Default::default()
+    }
+    .insert(db)
+    .await?;
+    order_item::ActiveModel {
+        order_id: Set(om.id),
+        item_id: Set(svc.id),
+        qty: Set(1),
+        price_cents: Set(svc.price_cents),
+        ..Default::default()
+    }
+    .insert(db)
+    .await?;
+
+    Ok(())
+}
+
+/// 夏威夷區用的直接買訂單小幫手
+async fn mk_hawaii_order(
+    db: &sea_orm::DbConn,
+    buyer_id: i32,
+    shop_name: &str,
+    item_idx: usize,
+    qty: i32,
+    status: &str,
+) -> Result<(), sea_orm::DbErr> {
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+    let sh = shop::Entity::find()
+        .filter(shop::Column::Name.eq(shop_name))
+        .one(db)
+        .await?
+        .unwrap();
+    let items = item::Entity::find()
+        .filter(item::Column::ShopId.eq(sh.id))
+        .order_by_asc(item::Column::Id)
+        .all(db)
+        .await?;
+    let p = &items[item_idx % items.len()];
+    let om = order::ActiveModel {
+        buyer_id: Set(buyer_id),
+        shop_id: Set(sh.id),
+        status: Set(status.to_string()),
+        pickup_at: Set(None),
+        date: Set(None),
+        window: Set(None),
+        total_cents: Set(p.price_cents * qty),
+        remark: Set(None),
+        created_at: Set(Utc::now()),
+        ..Default::default()
+    }
+    .insert(db)
+    .await?;
+    order_item::ActiveModel {
+        order_id: Set(om.id),
+        item_id: Set(p.id),
+        qty: Set(qty),
+        price_cents: Set(p.price_cents),
+        ..Default::default()
+    }
+    .insert(db)
+    .await?;
+    if status != "cancelled" {
+        if let Some(st) = p.stock {
+            let mut am: item::ActiveModel = item::Entity::find_by_id(p.id)
+                .one(db)
+                .await?
+                .unwrap()
+                .into();
+            am.stock = Set(Some(st - qty));
+            am.update(db).await?;
+        }
+    }
     Ok(())
 }
 
